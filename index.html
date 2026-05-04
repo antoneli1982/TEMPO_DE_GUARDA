@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Rodovia Saudável</title>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Poppins',sans-serif}
+#c{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
+
+.screen{position:absolute;top:0;left:0;width:100%;height:100%;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:100}
+.screen.on{display:flex}
+.tape{width:100%;height:34px;flex-shrink:0;background:repeating-linear-gradient(-45deg,#FF6B00 0,#FF6B00 17px,#111 17px,#111 34px);opacity:.75}
+
+/* MENU */
+#ms{background:rgba(4,3,1,.92)}
+.mtitle{font-size:clamp(2.4em,7vw,4.6em);color:#FF6B00;text-transform:uppercase;letter-spacing:3px;text-align:center;line-height:1.1;font-weight:900;text-shadow:0 0 40px rgba(255,107,0,.9),0 5px 0 #7a2e00}
+.msub{color:#FFCC00;font-size:clamp(.85em,2.5vw,1.1em);letter-spacing:2px;text-align:center;margin:8px 0 4px;font-weight:700}
+.mdesc{color:#888;font-size:.85em;text-align:center;line-height:1.85;max-width:360px;margin:0 auto 24px}
+.phases-preview{display:flex;gap:12px;margin:0 0 24px;flex-wrap:wrap;justify-content:center}
+.ph-chip{background:rgba(255,107,0,.12);border:1px solid rgba(255,107,0,.4);border-radius:20px;padding:5px 14px;color:#FFCC00;font-size:.78em;font-weight:600;letter-spacing:.5px}
+
+/* BUTTONS */
+.btn{background:linear-gradient(135deg,#FF6B00,#FF9400);color:#fff;border:none;padding:12px 44px;font-family:'Poppins',sans-serif;font-size:1.05em;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;cursor:pointer;border-radius:6px;box-shadow:0 6px 0 #7a2e00,0 0 22px rgba(255,107,0,.35);transition:all .12s;margin:5px;display:inline-block}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 0 #7a2e00,0 0 32px rgba(255,140,0,.55)}
+.btn:active{transform:translateY(3px);box-shadow:0 3px 0 #7a2e00}
+.btn.sec{background:linear-gradient(135deg,#333,#555);box-shadow:0 6px 0 #111}
+.btn.sec:hover{box-shadow:0 8px 0 #111}
+
+/* SELECT */
+#ss{background:rgba(4,3,1,.92)}
+.stitle{color:#FFCC00;font-size:clamp(1.1em,3.5vw,1.7em);font-weight:800;letter-spacing:2px;text-align:center;margin-bottom:4px;text-transform:uppercase}
+.cards{display:flex;gap:18px;margin:18px 0;flex-wrap:wrap;justify-content:center}
+.card{background:rgba(255,107,0,.08);border:2px solid #FF6B00;border-radius:10px;padding:16px 26px;cursor:pointer;text-align:center;transition:all .18s;min-width:128px}
+.card:hover,.card.sel{background:rgba(255,107,0,.26);box-shadow:0 0 20px rgba(255,107,0,.5);transform:scale(1.05)}
+.cemoji{font-size:3.5em;display:block;margin-bottom:5px}
+.cname{color:#FFCC00;font-size:1.05em;font-weight:700;letter-spacing:1px}
+.cdesc{color:#999;font-size:.78em;margin-top:3px}
+
+/* HUD */
+#hud{position:absolute;top:0;left:0;right:0;padding:11px 15px;z-index:50;pointer-events:none;display:none}
+#hud.on{display:block}
+.hudrow{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.hlabel{color:#fff;font-size:.82em;font-weight:700;text-shadow:1px 1px 4px #000}
+.hbg{width:155px;height:16px;background:rgba(0,0,0,.6);border:2px solid rgba(255,255,255,.25);border-radius:9px;overflow:hidden}
+#hfill{height:100%;width:100%;background:linear-gradient(90deg,#4CAF50,#8BC34A);border-radius:9px;transition:width .3s,background .5s}
+#hnum{color:#fff;font-size:.8em;font-weight:700;text-shadow:1px 1px 3px #000;min-width:36px}
+.cbadge{background:rgba(0,0,0,.6);border:2px solid rgba(255,107,0,.5);border-radius:18px;padding:3px 10px;color:#fff;font-size:.8em;font-weight:600;text-shadow:1px 1px 3px #000}
+.phbadge{background:rgba(0,0,0,.65);border:2px solid rgba(255,204,0,.5);border-radius:18px;padding:3px 10px;color:#FFCC00;font-size:.8em;font-weight:700;text-shadow:1px 1px 3px #000;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#progwrap{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);width:68%;max-width:390px;pointer-events:none}
+.plabel{color:rgba(255,255,255,.65);font-size:.72em;text-align:center;margin-bottom:3px;text-shadow:1px 1px 3px #000;font-weight:600}
+.pbg{height:9px;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.22);border-radius:5px;overflow:hidden}
+#pfill{height:100%;width:0%;background:linear-gradient(90deg,#FF6B00,#FFCC00);border-radius:5px;transition:width .15s}
+.hint{position:absolute;bottom:46px;right:13px;color:rgba(255,255,255,.38);font-size:.67em;text-align:right;text-shadow:1px 1px 3px #000;line-height:1.85;pointer-events:none}
+
+/* OVERLAYS */
+#df,#gf,#so{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;opacity:0;z-index:60;transition:opacity .32s}
+#df{background:rgba(255,0,0,.3)}
+#gf{background:rgba(0,255,100,.18)}
+#so{background:radial-gradient(ellipse at center,transparent 35%,rgba(140,0,0,.45) 100%)}
+
+/* FLOAT TEXTS */
+#floats{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;overflow:hidden;z-index:70}
+.ft{position:absolute;font-size:1.25em;font-weight:700;text-align:center;text-shadow:2px 2px 5px #000;animation:fup 1.4s ease-out forwards}
+@keyframes fup{0%{opacity:1;transform:translateY(0) scale(1)}50%{opacity:1;transform:translateY(-44px) scale(1.18)}100%{opacity:0;transform:translateY(-88px) scale(.85)}}
+
+/* PHASE BANNER */
+#pb{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;pointer-events:none;opacity:0;transition:opacity .4s;z-index:85;background:rgba(0,0,0,.5)}
+#pb.on{opacity:1}
+.pbn{color:rgba(255,204,0,.75);font-size:clamp(1em,3vw,1.3em);font-weight:700;letter-spacing:3px;text-shadow:2px 2px 8px #000;text-transform:uppercase}
+.pbname{color:#fff;font-size:clamp(1.8em,6vw,3.2em);font-weight:900;letter-spacing:1px;text-shadow:0 0 28px rgba(255,107,0,.9),2px 2px 0 #000;text-transform:uppercase;line-height:1.2;background:rgba(0,0,0,.55);padding:8px 28px;border-radius:8px;border:2px solid rgba(255,107,0,.55)}
+
+/* END */
+#es{background:rgba(4,3,1,.93)}
+.trophy{font-size:5.5em;filter:drop-shadow(0 0 22px rgba(255,204,0,.85));animation:tp 2s ease-in-out infinite;margin:12px 0}
+@keyframes tp{0%,100%{transform:scale(1) rotate(-3deg)}50%{transform:scale(1.07) rotate(3deg)}}
+.etitle{font-size:clamp(1.3em,4vw,2.3em);color:#FFCC00;letter-spacing:2px;text-transform:uppercase;text-shadow:0 0 22px rgba(255,204,0,.6);text-align:center;font-weight:800}
+.estats{color:#ccc;text-align:center;font-size:.92em;line-height:2.1;margin:12px 0 14px}
+.estats b{color:#FFCC00;font-weight:700}
+.cvs{display:none} /* replaced */
+
+/* INFO PANEL — Dia Mundial Sem Tabaco */
+.infocard{background:#0d0d0d;border-radius:12px;overflow:hidden;max-width:420px;width:100%;margin:8px 0 14px;border:1px solid rgba(255,255,255,.1)}
+.infocard-top{background:linear-gradient(135deg,#1a0010 0%,#0a1a00 100%);padding:12px 14px 8px}
+.ic-headline{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px}
+.ic-left{color:#FF2D78;font-size:clamp(.9em,2.5vw,1.15em);font-weight:900;line-height:1.15;text-transform:uppercase;letter-spacing:.5px}
+.ic-right{color:#1a1a1a;font-size:clamp(.78em,2vw,.95em);font-weight:900;line-height:1.2;text-transform:uppercase;text-align:right;background:#8DC63F;padding:4px 8px;border-radius:6px;white-space:nowrap}
+.ic-right span{color:#111;display:block}
+.ic-tagline{color:rgba(255,255,255,.55);font-size:.7em;line-height:1.5;border-top:1px solid rgba(255,255,255,.08);padding-top:6px}
+.ic-tagline b{color:#FF2D78}
+.infocard-risks{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:rgba(255,255,255,.06)}
+.ic-risk{background:#111;padding:7px 10px;display:flex;align-items:center;gap:7px}
+.ic-risk-icon{font-size:1.2em;flex-shrink:0}
+.ic-risk-text{font-size:.65em;color:rgba(255,255,255,.7);line-height:1.3;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+.ic-risk-text b{color:#8DC63F;display:block}
+.infocard-cta{background:linear-gradient(90deg,#FF2D78 0%,#c9006a 50%,#8DC63F 100%);padding:9px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ic-cta-left{color:#fff;font-size:.72em;font-weight:800;text-transform:uppercase;line-height:1.3}
+.ic-cta-right{color:#fff;font-size:.72em;font-weight:800;text-transform:uppercase;line-height:1.3;text-align:right}
+.infocard-footer{background:#111;padding:7px 14px;text-align:center}
+.ic-date{color:#FF2D78;font-size:.75em;font-weight:700;letter-spacing:1px}
+.ic-date span{color:#8DC63F}
+.ic-136{color:rgba(255,255,255,.5);font-size:.65em;margin-top:2px}
+.ic-136 b{color:#FFD700}
+
+/* NAME INPUT */
+#ns{background:rgba(4,3,1,.92)}
+.nameinput{background:rgba(255,255,255,.07);border:2px solid #FF6B00;border-radius:8px;color:#fff;font-family:'Poppins',sans-serif;font-size:1.35em;font-weight:600;padding:13px 22px;text-align:center;outline:none;width:min(300px,80vw);letter-spacing:1px;margin:14px 0;display:block;margin-left:auto;margin-right:auto}
+.nameinput::placeholder{color:rgba(255,255,255,.28)}
+.nameinput:focus{border-color:#FFCC00;box-shadow:0 0 18px rgba(255,204,0,.3)}
+#ds{background:rgba(4,3,1,.92)}
+.diffcards{display:flex;gap:13px;margin:14px 0;flex-wrap:wrap;justify-content:center}
+.diffcard{background:rgba(255,107,0,.07);border:2px solid rgba(255,107,0,.3);border-radius:12px;padding:15px 16px;cursor:pointer;text-align:center;transition:all .2s;min-width:130px;max-width:158px;flex:1}
+.diffcard:hover,.diffcard.dsel{background:rgba(255,107,0,.28);box-shadow:0 0 22px rgba(255,107,0,.55);transform:scale(1.04);border-color:#FF6B00}
+.dicon{font-size:2.5em;margin-bottom:4px}
+.dname{color:#FFCC00;font-size:.78em;font-weight:800;letter-spacing:.8px;text-transform:uppercase;line-height:1.25;margin-bottom:3px}
+.dnum{color:#FF6B00;font-size:.72em;font-weight:700;margin-bottom:5px}
+.ddesc{color:#777;font-size:.7em;line-height:1.55;margin-bottom:5px}
+.dstars{font-size:.95em}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="df"></div>
+<div id="gf"></div>
+<div id="so"></div>
+<div id="floats"></div>
+<div id="pb"><div class="pbn" id="pbn">FASE 1</div><div class="pbname" id="pbname">🚶 INICIANTE</div></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hudrow">
+    <div style="display:flex;align-items:center;gap:7px">
+      <span class="hlabel" id="nameLbl" style="color:#FFCC00;font-weight:800;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+      <span class="hlabel">❤️</span>
+      <div class="hbg"><div id="hfill"></div></div>
+      <span id="hnum">100%</span>
+    </div>
+    <div class="phbadge" id="phlbl">🚶 INICIANTE</div>
+    <div class="cbadge">🚬 <span id="cc">0</span></div>
+  </div>
+  <div id="progwrap">
+    <div class="plabel" id="plbl">🛣️ FASE 1 — INICIANTE</div>
+    <div class="pbg"><div id="pfill"></div></div>
+  </div>
+  <div class="hint">← → ou A D<br>📱 deslize</div>
+</div>
+
+<!-- MENU -->
+<div id="ms" class="screen on">
+  <div class="tape"></div>
+  <div style="text-align:center;padding:22px 20px">
+    <div style="font-size:3em;margin-bottom:8px">🦺🚧</div>
+    <div class="mtitle">Rodovia<br>Saudável</div>
+    <div class="msub">⚠️ TABAGISMO É OBRA DE RISCO ⚠️</div>
+    <p class="mdesc">Corra pela rodovia em obras, <b style="color:#FF8C00">desvie dos cigarros</b>, use as <b style="color:#55EE88">tendas de socorro</b> e passe pelas <b style="color:#FFCC00">3 fases</b> com mais saúde possível!</p>
+    <div class="phases-preview">
+      <div class="ph-chip">🚶 FASE 1 · INICIANTE</div>
+      <div class="ph-chip">😏 FASE 2 · JÁ ME ACHO</div>
+      <div class="ph-chip">⚡ FASE 3 · CR7!</div>
+    </div>
+    <button class="btn" onclick="showName()">🚀 INICIAR JOGO</button>
+  </div>
+  <div class="tape"></div>
+</div>
+
+<!-- NAME INPUT -->
+<div id="ns" class="screen">
+  <div class="tape"></div>
+  <div style="text-align:center;padding:26px 20px">
+    <div style="font-size:3em;margin-bottom:10px">🦺</div>
+    <div class="stitle">Qual é o seu nome?</div>
+    <div style="color:#666;font-size:.8em;margin:5px 0 6px">Vai aparecer no seu troféu! 🏆</div>
+    <input type="text" id="pname" class="nameinput" placeholder="Digite seu nome..."
+           maxlength="22" autocomplete="off" spellcheck="false"
+           onkeydown="if(event.key==='Enter')confirmName()">
+    <button class="btn" onclick="confirmName()">CONTINUAR →</button>
+    <button class="btn sec" onclick="showMenu()" style="margin-top:4px">← VOLTAR</button>
+  </div>
+  <div class="tape"></div>
+</div>
+
+<!-- SELECT -->
+<div id="ss" class="screen">
+  <div class="tape"></div>
+  <div style="text-align:center;padding:20px">
+    <div class="stitle">Escolha seu personagem</div>
+    <div style="color:#666;font-size:.78em;margin-bottom:10px">Toque no personagem para escolher 👇</div>
+    <div class="cards">
+
+      <div class="card sel" id="cm" onclick="selChar('male')" style="cursor:pointer;-webkit-tap-highlight-color:transparent">
+        <!-- HOMEM SVG -->
+        <svg viewBox="0 0 70 82" width="68" height="80" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto 6px">
+          <rect x="17" y="52" width="36" height="26" rx="5" fill="#FF6B00"/>
+          <rect x="17" y="60" width="36" height="5" fill="#FFCC00"/>
+          <rect x="17" y="69" width="36" height="5" fill="#FFCC00"/>
+          <rect x="7" y="52" width="11" height="22" rx="4" fill="#FF6B00"/>
+          <rect x="52" y="52" width="11" height="22" rx="4" fill="#FF6B00"/>
+          <ellipse cx="12" cy="76" rx="5" ry="5" fill="#C8834B"/>
+          <ellipse cx="58" cy="76" rx="5" ry="5" fill="#C8834B"/>
+          <circle cx="35" cy="35" r="17" fill="#C8834B"/>
+          <ellipse cx="35" cy="26" rx="16" ry="9" fill="#2A1A0A"/>
+          <circle cx="28" cy="37" r="2.5" fill="#111"/>
+          <circle cx="42" cy="37" r="2.5" fill="#111"/>
+          <path d="M28 44 Q35 50 42 44" stroke="#6B3A1A" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <ellipse cx="35" cy="23" rx="19" ry="10" fill="#FFFFFF"/>
+          <rect x="15" y="27" width="40" height="6" rx="3" fill="#EEEEEE"/>
+        </svg>
+        <div class="cname">COLABORADOR</div>
+      </div>
+
+      <div class="card" id="cf" onclick="selChar('female')" style="cursor:pointer;-webkit-tap-highlight-color:transparent">
+        <!-- MULHER SVG: morena, cabelo preto, mechas ROXAS, capacete rosa -->
+        <svg viewBox="0 0 70 82" width="68" height="80" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:0 auto 6px">
+          <!-- Corpo (mais magro) -->
+          <rect x="21" y="52" width="28" height="26" rx="5" fill="#FF6B00"/>
+          <rect x="21" y="60" width="28" height="5" fill="#FFCC00"/>
+          <rect x="21" y="69" width="28" height="5" fill="#FFCC00"/>
+          <!-- Braços -->
+          <rect x="10" y="52" width="12" height="20" rx="4" fill="#FF6B00"/>
+          <rect x="48" y="52" width="12" height="20" rx="4" fill="#FF6B00"/>
+          <!-- Mãos morenas -->
+          <ellipse cx="16" cy="74" rx="5" ry="5" fill="#8B5A2B"/>
+          <ellipse cx="54" cy="74" rx="5" ry="5" fill="#8B5A2B"/>
+          <!-- Cabeça morena -->
+          <circle cx="35" cy="35" r="16" fill="#8B5A2B"/>
+          <!-- Cabelo preto (base) -->
+          <ellipse cx="35" cy="25" rx="17" ry="11" fill="#120800"/>
+          <!-- Mechas ROXAS bem vibrantes na frente -->
+          <rect x="24" y="18" width="7" height="24" rx="3.5" fill="#8B00FF"/>
+          <rect x="39" y="19" width="6" height="22" rx="3" fill="#AA00FF"/>
+          <!-- Fios laterais pretos -->
+          <rect x="17" y="28" width="7" height="18" rx="3.5" fill="#120800"/>
+          <rect x="46" y="28" width="7" height="18" rx="3.5" fill="#120800"/>
+          <!-- Mecha roxa lateral -->
+          <rect x="17" y="30" width="4" height="14" rx="2" fill="#9400D3"/>
+          <!-- Olhos -->
+          <circle cx="29" cy="36" r="2.5" fill="#111"/>
+          <circle cx="41" cy="36" r="2.5" fill="#111"/>
+          <!-- Sorriso -->
+          <path d="M28 44 Q35 50 42 44" stroke="#5A2000" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- Capacete ROSA -->
+          <ellipse cx="35" cy="23" rx="19" ry="10" fill="#FF69B4"/>
+          <rect x="15" y="27" width="40" height="6" rx="3" fill="#FF85C2"/>
+        </svg>
+        <div class="cname">COLABORADORA</div>
+      </div>
+
+    </div>
+    <p style="color:#555;font-size:.72em;margin-top:4px">Clique no personagem → vai para escolha de fase</p>
+    <button class="btn sec" onclick="showMenu()" style="margin-top:10px">← VOLTAR</button>
+  </div>
+  <div class="tape"></div>
+</div>
+
+<!-- DIFFICULTY SELECT -->
+<div id="ds" class="screen">
+  <div class="tape"></div>
+  <div style="text-align:center;padding:18px 16px">
+    <div class="stitle">Escolha a fase</div>
+    <div style="color:#555;font-size:.8em;margin-bottom:10px">Toque na fase para começar! 👇</div>
+    <div class="diffcards">
+      <div class="diffcard dsel" id="d0" onclick="selectPhase(0)" style="cursor:pointer;-webkit-tap-highlight-color:transparent">
+        <div class="dicon">🚶</div>
+        <div class="dnum">FASE 1</div>
+        <div class="dname">INICIANTE</div>
+        <div class="ddesc">Velocidade baixa<br>Poucos cigarros<br>Boa pra começar</div>
+        <div class="dstars">⭐</div>
+      </div>
+      <div class="diffcard" id="d1" onclick="selectPhase(1)" style="cursor:pointer;-webkit-tap-highlight-color:transparent">
+        <div class="dicon">😏</div>
+        <div class="dnum">FASE 2</div>
+        <div class="dname">JÁ ESTOU ME ACHANDO</div>
+        <div class="ddesc">Velocidade média<br>Mais ciladas<br>Desafiador</div>
+        <div class="dstars">⭐⭐⭐</div>
+      </div>
+      <div class="diffcard" id="d2" onclick="selectPhase(2)" style="cursor:pointer;-webkit-tap-highlight-color:transparent">
+        <div class="dicon">⚡</div>
+        <div class="dnum">FASE 3</div>
+        <div class="dname">AGORA SOU O CR7!</div>
+        <div class="ddesc">Velocidade máxima<br>Cigarros em todo lado<br>Modo difícil</div>
+        <div class="dstars">⭐⭐⭐⭐⭐</div>
+      </div>
+    </div>
+    <button class="btn sec" onclick="showSelect()">← VOLTAR</button>
+  </div>
+  <div class="tape"></div>
+</div>
+
+<!-- END -->
+<div id="es" class="screen">
+  <div class="tape"></div>
+  <div style="text-align:center;padding:18px;max-width:480px">
+    <div id="trp" class="trophy">🏆</div>
+    <div id="ename" style="color:#FF6B00;font-size:clamp(1em,3vw,1.5em);font-weight:800;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px"></div>
+    <div id="etitle" class="etitle">PARABÉNS!</div>
+    <div id="estats" class="estats"></div>
+    <div class="infocard">
+      <div class="infocard-top">
+        <div class="ic-headline">
+          <div class="ic-left">Sabor doce.<br>Consequência<br><span style="color:#8DC63F">amarga.</span></div>
+          <div class="ic-right">O formato<br>muda. O dano<br><span style="color:#FF2D78;background:transparent;padding:0">NÃO.</span></div>
+        </div>
+        <div class="ic-tagline">O vapor pode até ter sabor, mas <b>o impacto é real.</b><br>Cigarros eletrônicos causam <b>dependência</b> e danos à saúde.</div>
+      </div>
+      <div class="infocard-risks">
+        <div class="ic-risk"><span class="ic-risk-icon">🫁</span><div class="ic-risk-text"><b>Danos</b>aos pulmões</div></div>
+        <div class="ic-risk"><span class="ic-risk-icon">❤️</span><div class="ic-risk-text"><b>Aumenta</b>risco cardiovascular</div></div>
+        <div class="ic-risk"><span class="ic-risk-icon">🧠</span><div class="ic-risk-text"><b>Vicia e afeta</b>o cérebro</div></div>
+        <div class="ic-risk"><span class="ic-risk-icon">🛡️</span><div class="ic-risk-text"><b>Pode causar</b>doenças graves</div></div>
+      </div>
+      <div class="infocard-cta">
+        <div class="ic-cta-left">💚 Cuidar da sua saúde<br>é escolher viver.</div>
+        <div class="ic-cta-right">Escolha respirar.<br>Escolha sua vida.</div>
+      </div>
+      <div class="infocard-footer">
+        <div class="ic-date">31 DE MAIO — <span>DIA MUNDIAL SEM TABACO</span></div>
+        <div class="ic-136">Ajuda para parar de fumar: <b>136</b> — CVS · SUS · 24h</div>
+      </div>
+    </div>
+    <button class="btn" onclick="showDifficulty()">🔄 JOGAR DE NOVO</button>
+    <button class="btn sec" onclick="showMenu()">🏠 MENU</button>
+  </div>
+  <div class="tape"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+
+// ── RENDERER ──────────────────────────────────────────────
+var canvas3d = document.getElementById('c');
+var renderer = new THREE.WebGLRenderer({ canvas: canvas3d, antialias: true });
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+var scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x87CEEB, 55, 178);
+
+var camera = new THREE.PerspectiveCamera(70, 1, 0.1, 220);
+
+function resize() {
+  var w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── LIGHTING ──────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0xFFEECC, 0.6));
+var sun = new THREE.DirectionalLight(0xFFDDA0, 1.2);
+sun.position.set(18, 45, 25);
+sun.castShadow = true;
+sun.shadow.mapSize.width = 1024; sun.shadow.mapSize.height = 1024;
+sun.shadow.camera.left = -25; sun.shadow.camera.right = 25;
+sun.shadow.camera.top = 25; sun.shadow.camera.bottom = -25;
+sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 180;
+scene.add(sun);
+var fill = new THREE.DirectionalLight(0xCCDDFF, 0.3);
+fill.position.set(-10, 10, -10); scene.add(fill);
+
+// ── ENVIRONMENT ───────────────────────────────────────────
+// Sky
+scene.add(new THREE.Mesh(
+  new THREE.SphereGeometry(215, 16, 8),
+  new THREE.MeshBasicMaterial({ color: 0x87CEEB, side: THREE.BackSide })
+));
+// Ground
+var gnd = new THREE.Mesh(
+  new THREE.PlaneGeometry(200, 600),
+  new THREE.MeshLambertMaterial({ color: 0x7A5C3A })
+);
+gnd.rotation.x = -Math.PI / 2; gnd.position.set(0, -0.02, -290);
+gnd.receiveShadow = true; scene.add(gnd);
+// Road
+var road = new THREE.Mesh(
+  new THREE.PlaneGeometry(9, 600),
+  new THREE.MeshLambertMaterial({ color: 0x3A3A3A })
+);
+road.rotation.x = -Math.PI / 2; road.position.set(0, 0.01, -290);
+road.receiveShadow = true; scene.add(road);
+// Edge lines
+[-4.2, 4.2].forEach(function(x) {
+  var m = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.02, 600),
+    new THREE.MeshLambertMaterial({ color: 0xFFFFFF })
+  );
+  m.position.set(x, 0.02, -290); scene.add(m);
+});
+// Jersey barriers
+(function() {
+  for (var z = 5; z > -580; z -= 40) {
+    var pairs = [[-4.7, z], [4.7, z + 20]];
+    for (var p = 0; p < pairs.length; p++) {
+      var bx = pairs[p][0], bz = pairs[p][1];
+      var bm2 = new THREE.MeshLambertMaterial({ color: 0xBBBBBB });
+      var base = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.5, 16), bm2);
+      base.position.set(bx, 0.25, bz); scene.add(base);
+      var top = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.28, 16), bm2);
+      top.position.set(bx, 0.64, bz); scene.add(top);
+      var stripe = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.1, 16),
+        new THREE.MeshLambertMaterial({ color: 0xFF4400 }));
+      stripe.position.set(bx, 0.38, bz); scene.add(stripe);
+    }
+  }
+})();
+// Clouds
+function mkCloud(x, y, z) {
+  var g = new THREE.Group();
+  var m = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+  var pts = [[0,0,1.5],[-3,-0.6,1.2],[3,-0.6,1.2],[-1.6,-1.6,0.9],[1.6,-1.6,0.9]];
+  for (var i = 0; i < pts.length; i++) {
+    var s = new THREE.Mesh(new THREE.SphereGeometry(pts[i][2], 6, 5), m);
+    s.scale.y = 0.55; s.position.set(pts[i][0], pts[i][1], 0); g.add(s);
+  }
+  g.position.set(x, y, z); return g;
+}
+for (var ci = 0; ci < 9; ci++) {
+  scene.add(mkCloud((Math.random()-0.5)*150, 38+Math.random()*18, -30-Math.random()*200));
+}
+
+// ── SCROLLING MARKINGS ────────────────────────────────────
+var MSPACE = 11, MCNT = 22;
+var marks = [];
+for (var mi = 0; mi < MCNT; mi++) {
+  var mk = new THREE.Mesh(
+    new THREE.BoxGeometry(0.13, 0.02, 4),
+    new THREE.MeshLambertMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.65 })
+  );
+  mk.position.set(0, 0.02, -mi * MSPACE); scene.add(mk); marks.push(mk);
+}
+// Road cones
+var CCNT = 18, cones = [];
+for (var ki = 0; ki < CCNT; ki++) {
+  var cg = new THREE.Group();
+  var cn = new THREE.Mesh(new THREE.CylinderGeometry(0, 0.2, 0.65, 8),
+    new THREE.MeshLambertMaterial({ color: 0xFF3300 }));
+  cn.position.y = 0.46; cg.add(cn);
+  var csw = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.1, 8),
+    new THREE.MeshLambertMaterial({ color: 0xFFFFFF }));
+  csw.position.y = 0.38; cg.add(csw);
+  var cbs = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.28, 0.08, 8),
+    new THREE.MeshLambertMaterial({ color: 0x222222 }));
+  cbs.position.y = 0.04; cg.add(cbs);
+  var cside = ki % 2 === 0 ? -4.85 : 4.85;
+  cg.position.set(cside, 0, -ki * (MSPACE * MCNT / CCNT));
+  scene.add(cg); cones.push({ m: cg, side: cside });
+}
+
+// ── LANES & CHARACTER ─────────────────────────────────────
+var LANES = [-2.5, 0, 2.5];
+var charData = null, charX = 0, targetLaneX = 0;
+var laneIdx = 1, walkT = 0, laneCD = 0;
+
+function lmat(c) { return new THREE.MeshLambertMaterial({ color: c }); }
+function bmat(c) { return new THREE.MeshBasicMaterial({ color: c }); }
+
+function buildChar(female) {
+  if (charData) scene.remove(charData.g);
+  var g = new THREE.Group();
+  var skin = female ? 0x8B5A2B : 0xC8834B;  // morena escura vs homem médio
+  var vest = 0xFF6B00, pants = 0x1A2E4A, helm = female ? 0xFF69B4 : 0xFFFFFF;
+  var boot = 0x3D2B1F, yel = 0xFFCC00;
+  // Female is slimmer
+  var bw = female ? 0.62 : 0.85;  // body width
+  var aw = female ? 0.19 : 0.23;  // arm width
+
+  // Torso
+  var torso = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.95, 0.5), lmat(vest));
+  torso.position.y = 1.25; torso.castShadow = true; g.add(torso);
+  // Reflective stripes
+  [1.05, 1.45].forEach(function(sy) {
+    var s = new THREE.Mesh(new THREE.BoxGeometry(bw + 0.03, 0.1, 0.52), lmat(yel));
+    s.position.y = sy; g.add(s);
+  });
+  // Head
+  var head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), lmat(skin));
+  head.position.y = 1.96; head.castShadow = true; g.add(head);
+  // Eyes
+  [-0.12, 0.12].forEach(function(ex) {
+    var eye = new THREE.Mesh(new THREE.SphereGeometry(0.058, 6, 6), bmat(0x222222));
+    eye.position.set(ex, 2.01, 0.27); g.add(eye);
+  });
+  // Mouth
+  var mo = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.04, 0.04), bmat(0x8B3A00));
+  mo.position.set(0, 1.84, 0.29); g.add(mo);
+
+  // FEMALE: morena — cabelo castanho-escuro com mechas roxas vibrantes
+  if (female) {
+    // Base dark brown hair (back hemisphere)
+    var hairBase = new THREE.Mesh(
+      new THREE.SphereGeometry(0.32, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.68),
+      lmat(0x1A0A00)   // castanho muito escuro
+    );
+    hairBase.position.set(0, 1.92, -0.02); g.add(hairBase);
+    // Front fringe
+    var fringe = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.14, 0.14), lmat(0x1A0A00));
+    fringe.position.set(0, 2.1, 0.22); g.add(fringe);
+    // Long hair down the back
+    var longHair = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.58, 0.15), lmat(0x1A0A00));
+    longHair.position.set(0, 1.6, -0.28); g.add(longHair);
+    // Side strands framing face
+    var sL = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.42, 0.11), lmat(0x1A0A00));
+    sL.position.set(-0.31, 1.75, -0.03); g.add(sL);
+    var sR = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.42, 0.11), lmat(0x1A0A00));
+    sR.position.set(0.31, 1.75, -0.03); g.add(sR);
+    // ── PURPLE STREAKS (bem vibrantes) ──
+    // Main thick streak - left front
+    var p1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.3, 0.13), lmat(0x8B00FF));
+    p1.position.set(0.2, 1.88, -0.18); g.add(p1);
+    // Second streak - right side
+    var p2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.28, 0.12), lmat(0xAA00FF));
+    p2.position.set(-0.17, 1.85, -0.2); g.add(p2);
+    // Long purple strand going down
+    var p3 = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.36, 0.11), lmat(0x9400D3));
+    p3.position.set(0.22, 1.62, -0.24); g.add(p3);
+    // Front purple fringe tip
+    var p4 = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.12), lmat(0xBB00FF));
+    p4.position.set(-0.1, 2.06, 0.2); g.add(p4);
+  }
+
+  // Helmet dome
+  var hd = new THREE.Mesh(
+    new THREE.SphereGeometry(0.34, 10, 8, 0, Math.PI * 2, 0, Math.PI * 0.55),
+    lmat(helm)
+  );
+  hd.position.y = 2.07; g.add(hd);
+  // Helmet brim
+  var hb = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 0.05, 12), lmat(helm));
+  hb.position.y = 1.98; g.add(hb);
+
+  // Legs
+  function mkLeg(xo) {
+    var lg = new THREE.Group(); lg.position.set(xo, 0.76, 0);
+    var shin = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.76, 0.27), lmat(pants));
+    shin.position.y = -0.38; shin.castShadow = true; lg.add(shin);
+    var bt = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.22, 0.38), lmat(boot));
+    bt.position.set(0, -0.82, 0.06); lg.add(bt); return lg;
+  }
+  var ll = mkLeg(-0.22), rl = mkLeg(0.22); g.add(ll, rl);
+
+  // Arms
+  function mkArm(xo) {
+    var ag = new THREE.Group(); ag.position.set(xo, 1.66, 0);
+    var arm = new THREE.Mesh(new THREE.BoxGeometry(aw, 0.74, aw), lmat(vest));
+    arm.position.y = -0.37; arm.castShadow = true; ag.add(arm);
+    var hand = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 5), lmat(skin));
+    hand.position.y = -0.82; ag.add(hand); return ag;
+  }
+  var armOff = female ? 0.44 : 0.55;
+  var la = mkArm(-armOff), ra = mkArm(armOff); g.add(la, ra);
+
+  g.position.set(0, 0, 0); scene.add(g);
+  return { g: g, ll: ll, rl: rl, la: la, ra: ra };
+}
+
+// ── OBJECT FACTORIES ──────────────────────────────────────
+function mkCig() {
+  var g = new THREE.Group();
+  var body = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 1.5, 8),
+    new THREE.MeshLambertMaterial({ color: 0xF5F5DC }));
+  g.add(body);
+  var filter = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.35, 8),
+    new THREE.MeshLambertMaterial({ color: 0x8B6914 }));
+  filter.position.y = -0.93; g.add(filter);
+  var tip = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.07, 8),
+    new THREE.MeshBasicMaterial({ color: 0xFF4500 }));
+  tip.position.y = 0.78; g.add(tip);
+  var glow = new THREE.PointLight(0xFF2200, 1.8, 3.5); glow.position.y = 0.8; g.add(glow);
+  g.rotation.z = Math.PI / 2;
+  g.rotation.y = Math.random() * Math.PI;
+  return g;
+}
+
+function mkPen() {
+  var cols = [0x2196F3, 0x4CAF50, 0xFF5722, 0x9C27B0, 0x009688];
+  var col = cols[Math.floor(Math.random() * cols.length)];
+  var g = new THREE.Group();
+  var body = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.22, 1.0),
+    new THREE.MeshLambertMaterial({ color: col }));
+  g.add(body);
+  var conn = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.14, 0.32),
+    new THREE.MeshLambertMaterial({ color: 0xAAAAAA }));
+  conn.position.z = 0.66; g.add(conn);
+  var led = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.07, 0.04),
+    new THREE.MeshBasicMaterial({ color: 0x00FF44 }));
+  led.position.set(0.12, 0.15, 0); g.add(led);
+  g.rotation.y = Math.random() * Math.PI;
+  return g;
+}
+
+function mkTent() {
+  var g = new THREE.Group();
+  var body = new THREE.Mesh(new THREE.BoxGeometry(3.5, 2.8, 4.5),
+    new THREE.MeshLambertMaterial({ color: 0xF0F0F0 }));
+  body.position.y = 1.4; body.castShadow = true; g.add(body);
+  var roof = new THREE.Mesh(new THREE.CylinderGeometry(0, 2.6, 1.6, 4),
+    new THREE.MeshLambertMaterial({ color: 0xDDDDDD }));
+  roof.position.y = 3.6; roof.rotation.y = Math.PI / 4; g.add(roof);
+  var rm = new THREE.MeshLambertMaterial({ color: 0xDD0000 });
+  var ch = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.46, 0.12), rm);
+  ch.position.set(0, 1.7, 2.28); g.add(ch);
+  var cv2 = new THREE.Mesh(new THREE.BoxGeometry(0.46, 1.5, 0.12), rm);
+  cv2.position.set(0, 1.7, 2.28); g.add(cv2);
+  var gl2 = new THREE.PointLight(0x00FF88, 2.2, 7); gl2.position.set(0, 2, 0); g.add(gl2);
+  return g;
+}
+
+function mkPolo() {
+  var g = new THREE.Group();
+  var wm = new THREE.MeshLambertMaterial({ color: 0xEEEEEE });
+  var om = new THREE.MeshLambertMaterial({ color: 0xFF6B00 });
+  var dk = new THREE.MeshLambertMaterial({ color: 0x222222 });
+  var glm = new THREE.MeshLambertMaterial({ color: 0x99CCFF, transparent: true, opacity: 0.75 });
+  var cab = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.7, 2.2), wm);
+  cab.position.set(0, 1.05, -0.6); cab.castShadow = true; g.add(cab);
+  var ws = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.88, 0.08), glm);
+  ws.position.set(0, 1.38, -1.72); g.add(ws);
+  var st = new THREE.Mesh(new THREE.BoxGeometry(2.05, 0.3, 2.25), om);
+  st.position.set(0, 0.65, -0.6); g.add(st);
+  var bed = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.38, 3.0), wm);
+  bed.position.set(0, 0.49, 1.9); g.add(bed);
+  [-1.05, 1.05].forEach(function(bx) {
+    var bw = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.65, 3.0), wm);
+    bw.position.set(bx, 0.73, 1.9); g.add(bw);
+  });
+  var wg = new THREE.CylinderGeometry(0.42, 0.42, 0.28, 10);
+  var wps = [[-1.05,0.42,-1.3],[1.05,0.42,-1.3],[-1.05,0.42,1.1],[1.05,0.42,1.1]];
+  for (var wi = 0; wi < wps.length; wi++) {
+    var wh = new THREE.Mesh(wg, dk);
+    wh.rotation.z = Math.PI/2; wh.position.set(wps[wi][0],wps[wi][1],wps[wi][2]); g.add(wh);
+  }
+  // Headlights (for blink animation)
+  var hlights = [];
+  var hlm = new THREE.MeshLambertMaterial({ color: 0xFFFF88, emissive: 0xFFFF00 });
+  [-0.58, 0.58].forEach(function(hx) {
+    var h = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.17, 0.05), hlm.clone());
+    h.position.set(hx, 1.12, -1.73); g.add(h); hlights.push(h);
+  });
+  return { g: g, hlights: hlights };
+}
+
+function mkRoller() {
+  var g = new THREE.Group();
+  var ym = new THREE.MeshLambertMaterial({ color: 0xFFCC00 });
+  var gm = new THREE.MeshLambertMaterial({ color: 0x888888 });
+  var dk = new THREE.MeshLambertMaterial({ color: 0x333333 });
+  var body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.6, 2.8), ym);
+  body.position.y = 1.8; body.castShadow = true; g.add(body);
+  var cab = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.0, 1.4), ym);
+  cab.position.set(0, 2.9, 0.2); g.add(cab);
+  // Driver silhouette
+  var driver = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.8, 0.5), lmat(0xFF6B00));
+  driver.position.set(0, 3.5, 0.2); g.add(driver);
+  var dhead = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), lmat(0xC8834B));
+  dhead.position.set(0, 4.15, 0.2); g.add(dhead);
+  var dhelm = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 8, 0, Math.PI*2, 0, Math.PI*0.55),
+    lmat(0xFFCC00));
+  dhelm.position.set(0, 4.2, 0.2); g.add(dhelm);
+  // Drum group (spins)
+  var drumGroup = new THREE.Group(); drumGroup.position.set(0, 0.9, -1.8);
+  var drum = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 2.3, 12), gm);
+  drum.rotation.z = Math.PI / 2; drumGroup.add(drum);
+  for (var ri = 0; ri < 6; ri++) {
+    var ridge = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.04, 6, 12), gm);
+    ridge.rotation.y = Math.PI / 2;
+    ridge.position.set(-0.75 + ri * 0.3, 0, 0); drumGroup.add(ridge);
+  }
+  g.add(drumGroup);
+  var wg = new THREE.CylinderGeometry(0.55, 0.55, 0.3, 10);
+  var rwp = [[-1.05,1.3],[1.05,1.3],[-1.05,0.1],[1.05,0.1]];
+  for (var rwi = 0; rwi < rwp.length; rwi++) {
+    var rw = new THREE.Mesh(wg, dk); rw.rotation.z = Math.PI/2;
+    rw.position.set(rwp[rwi][0], 0.55, rwp[rwi][1]); g.add(rw);
+  }
+  return { g: g, drumGroup: drumGroup };
+}
+
+function mkExcavator() {
+  var g = new THREE.Group();
+  var ym = new THREE.MeshLambertMaterial({ color: 0xFFCC00 });
+  var dk = new THREE.MeshLambertMaterial({ color: 0x333333 });
+  var gm = new THREE.MeshLambertMaterial({ color: 0x777777 });
+  // Tracks
+  var trk = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.7, 4.0), dk);
+  trk.position.y = 0.35; g.add(trk);
+  [-1.3, 1.3].forEach(function(tx) {
+    var ts = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 4.0), dk);
+    ts.position.set(tx, 0.5, 0); g.add(ts);
+  });
+  // Upper body (rotates)
+  var ub = new THREE.Group(); ub.position.y = 0.7;
+  var ubody = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.9, 2.6), ym);
+  ubody.position.y = 0.95; ubody.castShadow = true; ub.add(ubody);
+  var cabx = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 1.6), ym);
+  cabx.position.set(-0.2, 2.3, -0.1); ub.add(cabx);
+  var ws2 = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.8, 0.07),
+    new THREE.MeshLambertMaterial({ color: 0x99CCFF, transparent: true, opacity: 0.75 }));
+  ws2.position.set(-0.2, 2.3, -0.85); ub.add(ws2);
+  // Driver
+  var edrv = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.75, 0.5), lmat(0xFF6B00));
+  edrv.position.set(-0.2, 3.1, -0.1); ub.add(edrv);
+  var edhd = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), lmat(0xC8834B));
+  edhd.position.set(-0.2, 3.7, -0.1); ub.add(edhd);
+  var edhlm = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 8, 0, Math.PI*2, 0, Math.PI*0.55),
+    lmat(0xFFFFFF));
+  edhlm.position.set(-0.2, 3.75, -0.1); ub.add(edhlm);
+  // Arm group (pivots)
+  var armGrp = new THREE.Group(); armGrp.position.set(0.5, 2.2, 0);
+  var boom = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 2.8), ym);
+  boom.position.z = -1.4; armGrp.add(boom);
+  var stick = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 2.0), ym);
+  stick.position.set(0, -0.3, -3.3); stick.rotation.x = -0.3; armGrp.add(stick);
+  var bucket = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.8), gm);
+  bucket.position.set(0, -0.6, -4.6); armGrp.add(bucket);
+  for (var ti = 0; ti < 4; ti++) {
+    var tooth = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.1), gm);
+    tooth.position.set(0.2 + ti * 0.2 - 0.3, -1.0, -4.9); armGrp.add(tooth);
+  }
+  ub.add(armGrp);
+  g.add(ub);
+  return { g: g, ub: ub, armGrp: armGrp };
+}
+
+// ── VW POLO (VICTORY CAR) ────────────────────────────────
+function mkCar() {
+  var g = new THREE.Group();
+  var white  = new THREE.MeshLambertMaterial({ color: 0xF3F3F3 });
+  var dk     = new THREE.MeshLambertMaterial({ color: 0x181818 });
+  var glass2 = new THREE.MeshLambertMaterial({ color: 0x5577AA, transparent: true, opacity: 0.72 });
+  var red2   = new THREE.MeshBasicMaterial({ color: 0xFF1100 });
+  var chrome2= new THREE.MeshLambertMaterial({ color: 0xCCCCCC });
+  var navy   = new THREE.MeshBasicMaterial({ color: 0x002060 });
+
+  // Lower body
+  var body = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.84, 4.1), white);
+  body.position.y = 0.74; body.castShadow = true; g.add(body);
+  // Cabin
+  var cabin = new THREE.Mesh(new THREE.BoxGeometry(1.73, 0.73, 2.32), white);
+  cabin.position.set(0, 1.62, -0.07); cabin.castShadow = true; g.add(cabin);
+  // Hood
+  var hood = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.08, 1.02), white);
+  hood.rotation.x = 0.11; hood.position.set(0, 1.19, 1.56); g.add(hood);
+  // Trunk
+  var trunk = new THREE.Mesh(new THREE.BoxGeometry(1.73, 0.07, 0.76), white);
+  trunk.rotation.x = -0.13; trunk.position.set(0, 1.21, -1.66); g.add(trunk);
+  // Front bumper (dark)
+  var fbump = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.42, 0.17), dk);
+  fbump.position.set(0, 0.44, 2.14); g.add(fbump);
+  // Rear bumper
+  var rbump = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.34, 0.17), dk);
+  rbump.position.set(0, 0.44, -2.14); g.add(rbump);
+  // Grille
+  var grille = new THREE.Mesh(new THREE.BoxGeometry(1.32, 0.22, 0.09), dk);
+  grille.position.set(0, 0.83, 2.16); g.add(grille);
+  for (var gi = 0; gi < 3; gi++) {
+    var gbar = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.035, 0.07), chrome2);
+    gbar.position.set(0, 0.73 + gi * 0.09, 2.15); g.add(gbar);
+  }
+  // VW badge
+  var badge = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.05, 8), chrome2);
+  badge.rotation.x = Math.PI/2; badge.position.set(0, 1.07, 2.19); g.add(badge);
+  var badgeInner = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.04, 0.06), navy);
+  badgeInner.position.set(0, 1.07, 2.2); g.add(badgeInner);
+  // Headlights
+  [[-0.72, 0.93, 2.14],[0.72, 0.93, 2.14]].forEach(function(p) {
+    var hl = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.2, 0.08),
+      new THREE.MeshLambertMaterial({ color: 0xEEEEFF }));
+    hl.position.set(p[0],p[1],p[2]); g.add(hl);
+    var drl = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.05, 0.06),
+      new THREE.MeshBasicMaterial({ color: 0xFFFFDD }));
+    drl.position.set(p[0], p[1]-0.14, p[2]); g.add(drl);
+  });
+  // Taillights
+  [[-0.7, 0.93, -2.15],[0.7, 0.93, -2.15]].forEach(function(p) {
+    var tl = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.25, 0.08), red2);
+    tl.position.set(p[0],p[1],p[2]); g.add(tl);
+  });
+  // Windshield (front)
+  var wsF = new THREE.Mesh(new THREE.BoxGeometry(1.51, 0.58, 0.07), glass2);
+  wsF.rotation.x = 0.27; wsF.position.set(0, 1.65, 1.05); g.add(wsF);
+  // Rear window
+  var wsR = new THREE.Mesh(new THREE.BoxGeometry(1.48, 0.5, 0.07), glass2);
+  wsR.rotation.x = -0.27; wsR.position.set(0, 1.63, -1.13); g.add(wsR);
+  // Side windows
+  [-0.87, 0.87].forEach(function(x) {
+    var sw1 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.43, 1.06), glass2);
+    sw1.position.set(x, 1.65, 0.38); g.add(sw1);
+    var sw2 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.38, 0.79), glass2);
+    sw2.position.set(x, 1.63, -0.58); g.add(sw2);
+  });
+  // Side mirrors
+  [-0.96, 0.96].forEach(function(x) {
+    var mir = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.1, 0.17), white);
+    mir.position.set(x, 1.53, 0.96); g.add(mir);
+  });
+  // Door handles
+  [-0.93, 0.93].forEach(function(x) {
+    [-0.14, 0.76].forEach(function(z2) {
+      var dh = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.04), chrome2);
+      dh.position.set(x, 1.13, z2); g.add(dh);
+    });
+  });
+  // Roof antenna
+  var ant = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.28, 6), dk);
+  ant.position.set(0.3, 2.05, -0.46); g.add(ant);
+  // Undercarriage
+  var under2 = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.1, 3.6), dk);
+  under2.position.y = 0.18; g.add(under2);
+  // WHEELS with spinning groups
+  var tireMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+  var rimMat2 = new THREE.MeshLambertMaterial({ color: 0x999999 });
+  var wpos = [[-0.97,0.36,1.28],[0.97,0.36,1.28],[-0.97,0.36,-1.28],[0.97,0.36,-1.28]];
+  var wheels = [];
+  wpos.forEach(function(p) {
+    var wg2 = new THREE.Group();
+    var tire = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.24, 14), tireMat);
+    tire.rotation.z = Math.PI/2; wg2.add(tire);
+    var rim2 = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.26, 8), rimMat2);
+    rim2.rotation.z = Math.PI/2; wg2.add(rim2);
+    for (var si = 0; si < 5; si++) {
+      var spk = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.22, 0.04), rimMat2);
+      spk.rotation.z = (si/5)*Math.PI*2; spk.position.set(0, 0, 0); wg2.add(spk);
+    }
+    wg2.position.set(p[0], p[1], p[2]);
+    g.add(wg2); wheels.push(wg2);
+  });
+  // Driver visible through windshield
+  var dHead = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6),
+    new THREE.MeshLambertMaterial({ color: 0xC8834B }));
+  dHead.position.set(-0.35, 1.68, 0.58); dHead.visible = false; g.add(dHead);
+  var dHelm = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 8, 8, 0, Math.PI*2, 0, Math.PI*0.55),
+    new THREE.MeshLambertMaterial({ color: 0xFFFFFF }));
+  dHelm.position.set(-0.35, 1.74, 0.58); dHelm.visible = false; g.add(dHelm);
+  // Interior vest visible
+  var dBody = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.38, 0.28),
+    new THREE.MeshLambertMaterial({ color: 0xFF6B00 }));
+  dBody.position.set(-0.35, 1.38, 0.55); dBody.visible = false; g.add(dBody);
+  return { g: g, wheels: wheels, dHead: dHead, dHelm: dHelm, dBody: dBody };
+}
+
+// ── PLACA DE RODOVIA PARAMETRIZADA ───────────────────────
+function mkRoadSign(distText) {
+  var isArrival = (distText === 'CHEGOU!');
+  var g = new THREE.Group();
+  var postMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
+  [-1.15, 1.15].forEach(function(x) {
+    var post = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.07,5.2,8), postMat);
+    post.position.set(x, 2.6, 0); g.add(post);
+  });
+  var back = new THREE.Mesh(new THREE.BoxGeometry(3.0, 1.6, 0.07),
+    new THREE.MeshLambertMaterial({ color: 0x333333 }));
+  back.position.set(0, 4.1, -0.05); g.add(back);
+
+  var cv2 = document.createElement('canvas');
+  cv2.width = 600; cv2.height = 320;
+  var cx = cv2.getContext('2d');
+  cx.fillStyle = isArrival ? '#4A3000' : '#005200';
+  cx.fillRect(0, 0, 600, 320);
+  cx.strokeStyle = isArrival ? '#FFD700' : '#FFFFFF';
+  cx.lineWidth = 14; cx.strokeRect(7, 7, 586, 306);
+  if (isArrival) {
+    cx.fillStyle = '#FFD700'; cx.font = 'bold 68px Arial Black, Arial';
+    cx.textAlign = 'center'; cx.fillText('\uD83C\uDFC1 BEM-VINDO A', 300, 115);
+    cx.fillStyle = '#FFFFFF'; cx.font = 'bold 118px Arial Black, Arial';
+    cx.fillText('JAÚ!', 300, 248);
+  } else {
+    cx.fillStyle = '#FFFFFF'; cx.beginPath();
+    cx.moveTo(52,160); cx.lineTo(52,120); cx.lineTo(100,120);
+    cx.lineTo(100,96); cx.lineTo(138,160);
+    cx.lineTo(100,224); cx.lineTo(100,200); cx.lineTo(52,200);
+    cx.closePath(); cx.fill();
+    cx.font = 'bold 108px Arial Black, Arial'; cx.textAlign = 'center';
+    cx.shadowColor='rgba(0,0,0,0.3)'; cx.shadowBlur=4;
+    cx.fillText('JAÚ', 370, 148);
+    cx.fillStyle='#FFD700'; cx.shadowBlur=0; cx.fillRect(160,162,420,6);
+    cx.fillStyle='#FFFFFF'; cx.font='bold 78px Arial Black, Arial';
+    cx.fillText(distText, 370, 254);
+    if (!cx.roundRect) { cx.roundRect=function(x,y,w,h,r){cx.beginPath();cx.moveTo(x+r,y);cx.lineTo(x+w-r,y);cx.arcTo(x+w,y,x+w,y+r,r);cx.lineTo(x+w,y+h-r);cx.arcTo(x+w,y+h,x+w-r,y+h,r);cx.lineTo(x+r,y+h);cx.arcTo(x,y+h,x,y+h-r,r);cx.lineTo(x,y+r);cx.arcTo(x,y,x+r,y,r);cx.closePath();}; }
+    cx.fillStyle='#003399'; cx.roundRect(22,18,58,38,4); cx.fill();
+    cx.fillStyle='#FFFFFF'; cx.font='bold 12px Arial'; cx.textAlign='center'; cx.fillText('SP',51,31);
+    cx.fillStyle='#FFD700'; cx.font='bold 16px Arial'; cx.fillText('225',51,50);
+  }
+  var tex = new THREE.CanvasTexture(cv2);
+  var face = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 1.6),
+    new THREE.MeshLambertMaterial({ map: tex, side: THREE.FrontSide }));
+  face.position.set(0, 4.1, 0.05); g.add(face);
+  var trim = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.08, 0.12),
+    new THREE.MeshLambertMaterial({ color: 0xCCCCCC }));
+  trim.position.set(0, 4.92, 0); g.add(trim);
+  return g;
+}
+// Static sign (100 km) visible on menu
+var staticSign = mkRoadSign('100 km');
+staticSign.position.set(6.5, 0, -55);
+scene.add(staticSign);
+var PHASES = [
+  { name: '🚶 INICIANTE',             num: 'FASE 1', dist: 300, spd0: 0.16, spd1: 0.22, obMin: 2.0, obMax: 3.2, cigC: 0.28 },
+  { name: '😏 JÁ ESTOU ME ACHANDO',   num: 'FASE 2', dist: 300, spd0: 0.16, spd1: 0.22, obMin: 1.6, obMax: 2.6, cigC: 0.55 },
+  { name: '⚡ AGORA SOU O CR7!',       num: 'FASE 3', dist: 300, spd0: 0.26, spd1: 0.38, obMin: 0.9, obMax: 1.6, cigC: 0.72 }
+];
+var TOTAL_DIST = 900;
+var SPAWN_Z = -82;
+
+// ── GAME STATE ────────────────────────────────────────────
+var gs = 'menu';
+var playerName = 'Participante';
+var chosenChar = 'male';
+var chosenPhase = 0;
+var health, cigsHit, progress, totalDist, speed;
+var curPhase, phaseDist, obTimer, obInt, tentTimer, sideTimer, sideInt;
+var menuAng = 0;
+var activeObjs = [];
+// ── VICTORY ──
+var victoryT = 0, carObj = null;
+// ── MILESTONES: placas JAU 100km → chegou ──
+var MILESTONES = [
+  { dist: 0,   text: '100 km' },
+  { dist: 95,  text: '80 km'  },
+  { dist: 195, text: '60 km'  },
+  { dist: 310, text: '50 km'  },
+  { dist: 420, text: '40 km'  },
+  { dist: 530, text: '30 km'  },
+  { dist: 630, text: '20 km'  },
+  { dist: 720, text: '10 km'  },
+  { dist: 790, text: '5 km'   },
+  { dist: 845, text: '2 km'   },
+  { dist: 875, text: 'CHEGOU!' }
+];
+var nextMilestone = 0;
+
+// ── HEALTH / UI ───────────────────────────────────────────
+function doDmg(amt) {
+  health = Math.max(0, health - amt);
+  doFlash('#df'); updHUD();
+  if (health <= 0) { health = 0; updHUD(); endGame(); }
+}
+function doHeal(amt) {
+  health = Math.min(100, health + amt);
+  doFlash('#gf'); updHUD();
+}
+function doFlash(id) {
+  var el = document.querySelector(id);
+  el.style.opacity = '1';
+  setTimeout(function() { el.style.opacity = '0'; }, 320);
+}
+function updHUD() {
+  var hf = document.getElementById('hfill');
+  hf.style.width = health + '%';
+  hf.style.background = health > 60
+    ? 'linear-gradient(90deg,#4CAF50,#8BC34A)'
+    : health > 30
+    ? 'linear-gradient(90deg,#FFCC00,#FF9800)'
+    : 'linear-gradient(90deg,#FF3300,#FF7700)';
+  document.getElementById('hnum').textContent = Math.round(health) + '%';
+  document.getElementById('cc').textContent = cigsHit;
+  var pct = (progress * 100).toFixed(1);
+  document.getElementById('pfill').style.width = pct + '%';
+  document.getElementById('nameLbl').textContent = playerName;
+  var ph = PHASES[curPhase];
+  document.getElementById('phlbl').textContent = ph.name;
+  document.getElementById('plbl').textContent = '\uD83D\uDEE3\uFE0F ' + ph.num + ' \u2014 ' + ph.name;
+  var so = document.getElementById('so');
+  if (health < 50) {
+    so.style.opacity = ((50 - health) / 50 * 0.65).toFixed(2);
+    scene.fog.color.setRGB(0.52 + (50-health)/300, 0.4 + health/300, health/280);
+  } else {
+    so.style.opacity = '0';
+    scene.fog.color.setRGB(0.53, 0.81, 0.92);
+  }
+}
+function showFloat(txt, col) {
+  var el = document.createElement('div');
+  el.className = 'ft'; el.textContent = txt; el.style.color = col;
+  el.style.left = (28 + Math.random() * 44) + '%'; el.style.top = '38%';
+  document.getElementById('floats').appendChild(el);
+  setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 1400);
+}
+function showPhaseBanner(idx) {
+  var ph = PHASES[idx];
+  document.getElementById('pbn').textContent = ph.num;
+  document.getElementById('pbname').textContent = ph.name;
+  var b = document.getElementById('pb');
+  b.classList.add('on');
+  setTimeout(function() { b.classList.remove('on'); }, 2600);
+}
+
+// ── INPUT ─────────────────────────────────────────────────
+var touchX0 = 0;
+window.addEventListener('keydown', function(e) {
+  if (gs !== 'playing') return;
+  if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') mvLeft();
+  if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') mvRight();
+});
+canvas3d.addEventListener('touchstart', function(e) { touchX0 = e.touches[0].clientX; }, { passive: true });
+canvas3d.addEventListener('touchend', function(e) {
+  if (gs !== 'playing') return;
+  var dx = e.changedTouches[0].clientX - touchX0;
+  if (dx < -36) mvLeft(); else if (dx > 36) mvRight();
+}, { passive: true });
+function mvLeft()  { if (laneCD > 0 || laneIdx <= 0) return; laneIdx--; targetLaneX = LANES[laneIdx]; laneCD = 0.14; }
+function mvRight() { if (laneCD > 0 || laneIdx >= 2) return; laneIdx++; targetLaneX = LANES[laneIdx]; laneCD = 0.14; }
+
+// ── SPAWN ─────────────────────────────────────────────────
+function spawnObs() {
+  var ph = PHASES[curPhase];
+  var lane = Math.floor(Math.random() * 3);
+  var isCig = Math.random() < ph.cigC;
+  var mesh = isCig ? mkCig() : mkPen();
+  mesh.position.set(LANES[lane], isCig ? 0.3 : 0.22, SPAWN_Z);
+  scene.add(mesh);
+  activeObjs.push({ mesh: mesh, type: isCig ? 'cig' : 'pen', anim: null });
+}
+function spawnTent() {
+  var lane = Math.floor(Math.random() * 3);
+  var mesh = mkTent();
+  mesh.position.set(LANES[lane], 0, SPAWN_Z);
+  scene.add(mesh);
+  activeObjs.push({ mesh: mesh, type: 'heal', anim: null });
+}
+function spawnSide() {
+  var r = Math.random(), built, anim = null;
+  if (r < 0.37) {
+    var p = mkPolo(); built = p.g; anim = { type: 'polo', hlights: p.hlights, t: 0 };
+  } else if (r < 0.66) {
+    var ro = mkRoller(); built = ro.g; anim = { type: 'roller', dg: ro.drumGroup, t: 0 };
+  } else {
+    var ex = mkExcavator(); built = ex.g; anim = { type: 'excav', ub: ex.ub, ag: ex.armGrp, t: 0 };
+  }
+  var side = Math.random() < 0.5 ? -7.8 : 7.8;
+  built.position.set(side, 0, SPAWN_Z);
+  scene.add(built);
+  activeObjs.push({ mesh: built, type: 'decor', anim: anim });
+}
+
+// ── COLLISIONS ────────────────────────────────────────────
+function checkCols() {
+  for (var i = activeObjs.length - 1; i >= 0; i--) {
+    var o = activeObjs[i];
+    var dz = o.mesh.position.z;
+    var dx = Math.abs(o.mesh.position.x - charX);
+    var xThr = o.type === 'heal' ? 2.2 : 1.25;
+    var zIn = o.type === 'heal' ? (dz > -0.5 && dz < 6) : (dz > 1 && dz < 4.5);
+    if (zIn && dx < xThr && o.type !== 'decor') {
+      if (o.type === 'cig')  { doDmg(20); cigsHit++; showFloat('\uD83D\uDEAC -20 SAUDE!', '#FF2200'); }
+      if (o.type === 'pen')  { doDmg(10); showFloat('\uD83D\uDCBE -10 SAUDE!', '#FF9900'); }
+      if (o.type === 'heal') { doHeal(38); showFloat('\u2764\uFE0F\u200D\uD83E\uDE79 +38 CURADO!', '#00EE88'); }
+      scene.remove(o.mesh); activeObjs.splice(i, 1);
+    } else if (dz > 22) {
+      scene.remove(o.mesh); activeObjs.splice(i, 1);
+    }
+  }
+}
+
+// ── ANIMATE MACHINES ──────────────────────────────────────
+function animMachines(dt) {
+  for (var i = 0; i < activeObjs.length; i++) {
+    var o = activeObjs[i];
+    if (!o.anim) continue;
+    var a = o.anim; a.t += dt;
+    if (a.type === 'roller' && a.dg) {
+      a.dg.rotation.x += dt * speed * 90;
+    }
+    if (a.type === 'excav') {
+      if (a.ag) a.ag.rotation.x = Math.sin(a.t * 0.85) * 0.38 - 0.1;
+      if (a.ub) a.ub.rotation.y = Math.sin(a.t * 0.38) * 0.28;
+    }
+    if (a.type === 'polo' && a.hlights) {
+      var on = Math.floor(a.t * 1.5) % 2 === 0;
+      for (var li = 0; li < a.hlights.length; li++) {
+        a.hlights[li].material.emissiveIntensity = on ? 1.0 : 0.1;
+      }
+    }
+  }
+}
+
+// ── CHARACTER ANIMATION ───────────────────────────────────
+function animChar() {
+  if (!charData) return;
+  var spd = (speed / 0.06) * 4.5;
+  var amt = health < 50 ? 0.28 : 0.52;
+  var t = walkT * spd;
+  charData.ll.rotation.x =  Math.sin(t) * amt;
+  charData.rl.rotation.x = -Math.sin(t) * amt;
+  charData.la.rotation.x = -Math.sin(t) * (amt * 0.7);
+  charData.ra.rotation.x =  Math.sin(t) * (amt * 0.7);
+  charData.g.position.y = Math.abs(Math.sin(t * 2)) * 0.04;
+  if (health < 50) {
+    charData.g.rotation.z = Math.sin(walkT * 3) * 0.065 * (1 - health / 50);
+  } else {
+    charData.g.rotation.z *= 0.88;
+  }
+  charData.g.rotation.y = (targetLaneX - charX) * 0.09;
+}
+
+// ── PHASE UPDATE ──────────────────────────────────────────
+function updatePhase(dt) {
+  var ph = PHASES[curPhase];
+  var phPct = Math.min(1, phaseDist / ph.dist);
+  var sick = health < 50 ? 0.5 + health / 100 : 1.0;
+  speed = (ph.spd0 + (ph.spd1 - ph.spd0) * phPct) * sick;
+
+  phaseDist += speed * 60 * dt;
+  totalDist  += speed * 60 * dt;
+  progress = Math.min(1, totalDist / TOTAL_DIST);
+
+  obTimer += dt;
+  if (obTimer > obInt) {
+    obTimer = 0;
+    obInt = ph.obMin + Math.random() * (ph.obMax - ph.obMin);
+    spawnObs();
+  }
+
+  if (phaseDist >= ph.dist && curPhase < PHASES.length - 1) {
+    curPhase++;
+    phaseDist = 0;
+    speed = PHASES[curPhase].spd0;
+    obInt = PHASES[curPhase].obMax;
+    showPhaseBanner(curPhase);
+    showFloat('\uD83D\uDD25 NOVA FASE!', '#FFCC00');
+  }
+}
+
+// ── VICTORY ANIMATION ─────────────────────────────────────
+// ── MÚSICA DE VITÓRIA ────────────────────────────────────
+function playVictoryMusic() {
+  try {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    var ac = new AC();
+    function brass(freq, t0, dur, vol) {
+      var osc  = ac.createOscillator();
+      var osc2 = ac.createOscillator();
+      var filt = ac.createBiquadFilter();
+      var gain = ac.createGain();
+      filt.type = 'lowpass'; filt.frequency.value = 1800 + freq * 0.5;
+      osc.type  = 'sawtooth'; osc.frequency.value  = freq;
+      osc2.type = 'square';   osc2.frequency.value = freq * 2.005; // slight detune for richness
+      osc.connect(filt); osc2.connect(filt); filt.connect(gain); gain.connect(ac.destination);
+      gain.gain.setValueAtTime(0, ac.currentTime + t0);
+      gain.gain.linearRampToValueAtTime(vol, ac.currentTime + t0 + 0.04);
+      gain.gain.setValueAtTime(vol * 0.85, ac.currentTime + t0 + dur - 0.08);
+      gain.gain.linearRampToValueAtTime(0, ac.currentTime + t0 + dur);
+      osc.start(ac.currentTime + t0);  osc.stop(ac.currentTime + t0 + dur + 0.05);
+      osc2.start(ac.currentTime + t0); osc2.stop(ac.currentTime + t0 + dur + 0.05);
+    }
+    // Fanfarra triunfal em Sol Maior — estilo pódio
+    //  Chamada ascendente
+    brass(392.00, 0.00, 0.18, 0.22); // G4
+    brass(493.88, 0.18, 0.18, 0.22); // B4
+    brass(587.33, 0.36, 0.18, 0.22); // D5
+    brass(783.99, 0.54, 0.50, 0.28); // G5 — sustentado
+    // Resposta
+    brass(659.25, 1.15, 0.14, 0.20);
+    brass(587.33, 1.29, 0.14, 0.20);
+    brass(493.88, 1.43, 0.14, 0.20);
+    brass(587.33, 1.57, 0.45, 0.24); // D5
+    // Grande final — acorde pleno
+    brass(392.00, 2.15, 0.70, 0.20);
+    brass(493.88, 2.15, 0.70, 0.20);
+    brass(587.33, 2.15, 0.70, 0.20);
+    brass(783.99, 2.15, 0.90, 0.26);
+    // Nota final aguda
+    brass(392.00, 2.95, 0.16, 0.22);
+    brass(493.88, 3.11, 0.16, 0.22);
+    brass(587.33, 3.27, 0.16, 0.22);
+    brass(783.99, 3.43, 0.16, 0.22);
+    brass(1046.5, 3.59, 1.20, 0.30); // C6 — nota final triunfante!
+  } catch(e) {}
+}
+
+function startVictory() {
+  if (gs === 'victory' || gs === 'end') return;
+  gs = 'victory'; victoryT = 0;
+  document.getElementById('hud').classList.remove('on');
+  document.getElementById('pb').classList.remove('on');
+  document.getElementById('so').style.opacity = '0';
+  scene.fog.color.setRGB(0.53, 0.81, 0.92);
+  // Clear all active objects
+  for (var ci = 0; ci < activeObjs.length; ci++) scene.remove(activeObjs[ci].mesh);
+  activeObjs.length = 0;
+  // Spawn VW Polo from behind camera (behind player = high +z)
+  carObj = mkCar();
+  carObj.g.position.set(0, 0, 36);
+  carObj.g.rotation.y = Math.PI; // front faces -z (same direction player was running)
+  scene.add(carObj.g);
+  playVictoryMusic();
+
+}
+
+function updateVictory(dt) {
+  victoryT += dt; walkT += dt;
+
+  // Phase A (0-2.5s): Car drives in from behind, decelerating to z=-5
+  if (victoryT < 2.5) {
+    var targetZ = -5;
+    var dist2 = carObj.g.position.z - targetZ;
+    var spd2 = Math.max(2, dist2 * 4.5) * dt;
+    if (carObj.g.position.z > targetZ) {
+      carObj.g.position.z -= spd2;
+      var ws2 = spd2 * 0.55;
+      for (var wi = 0; wi < carObj.wheels.length; wi++) carObj.wheels[wi].rotation.x -= ws2;
+    }
+    // Character walks forward (z decreases toward car)
+    if (charData) {
+      charData.g.position.z -= 0.06;
+      animChar();
+    }
+    camera.position.set(charX, 6.5, 13);
+    camera.lookAt(charX * 0.3, 1.5, -3);
+  }
+  // Phase B (2.5-3.8s): Car arrives — player gets in, car bounces with joy
+  else if (victoryT < 3.8) {
+    var bt = victoryT - 2.5;
+    carObj.g.position.z = -5;
+    carObj.g.position.y = Math.abs(Math.sin(bt * 20)) * 0.12;
+    // Hide character, show driver inside car
+    if (charData && victoryT > 2.65) {
+      charData.g.visible = false;
+      // Show driver helmet color matching chosen char
+      var helmColor = (chosenChar === 'female') ? 0xFF69B4 : 0xFFFFFF;
+      carObj.dHelm.material.color.setHex(helmColor);
+      carObj.dHead.visible = true;
+      carObj.dHelm.visible = true;
+      carObj.dBody.visible = true;
+    }
+    if (Math.random() < 0.09) showFloat(['\uD83C\uDF89','\u2B50','\uD83C\uDFC6','\uD83C\uDF8A'][0|Math.random()*4], '#FFD700');
+    camera.position.set(0, 5.5, 11);
+    camera.lookAt(carObj.g.position.x, 2, carObj.g.position.z);
+  }
+  // Phase C (3.8-7.5s): Car accelerates away into the horizon (z decreases)
+  else if (victoryT < 7.5) {
+    var et = victoryT - 3.8;
+    var escSpd = (5 + et * 20) * dt;
+    carObj.g.position.z -= escSpd;
+    carObj.g.position.y = 0;
+    for (var wj = 0; wj < carObj.wheels.length; wj++) carObj.wheels[wj].rotation.x -= escSpd * 0.55;
+    // Camera pulls back for epic long shot
+    camera.position.x += (0 - camera.position.x) * 0.06;
+    camera.position.y += (10 - camera.position.y) * 0.04;
+    camera.position.z += (20 - camera.position.z) * 0.04;
+    camera.lookAt(0, 0, carObj.g.position.z + 20);
+    if (Math.random() < 0.1) showFloat(['\uD83C\uDF89','\u2728','\uD83C\uDF8A','\u2B50'][0|Math.random()*4], '#FFCC00');
+  }
+  // Phase D: Car gone, show end screen
+  else {
+    scene.remove(carObj.g); carObj = null;
+    endGame(); return;
+  }
+  renderer.render(scene, camera);
+}
+
+// ── MAIN LOOP ─────────────────────────────────────────────
+var clock = new THREE.Clock();
+
+function loop() {
+  requestAnimationFrame(loop);
+  var dt = Math.min(clock.getDelta(), 0.05);
+
+  if (gs === 'victory') { updateVictory(dt); return; }
+
+  if (gs !== 'playing') {
+    menuAng += dt * 0.18;
+    camera.position.set(Math.sin(menuAng) * 14, 8, Math.cos(menuAng) * 14 + 3);
+    camera.lookAt(0, 1.5, -15);
+    renderer.render(scene, camera);
+    return;
+  }
+
+  walkT += dt;
+  if (laneCD > 0) laneCD -= dt;
+
+  charX += (targetLaneX - charX) * 0.14;
+  if (charData) charData.g.position.x = charX;
+  animChar();
+
+  camera.position.x += (charX - camera.position.x) * 0.1;
+  camera.position.y = 5.0; camera.position.z = 9.5;
+  camera.lookAt(charX * 0.45, 1.5, -10);
+
+  updatePhase(dt);
+
+  // ── Spawn milestone signs ──
+  if (nextMilestone < MILESTONES.length && totalDist >= MILESTONES[nextMilestone].dist) {
+    var ms = MILESTONES[nextMilestone];
+    var sg = mkRoadSign(ms.text);
+    var sgSide = (nextMilestone % 2 === 0) ? 6.5 : -6.5;
+    if (sgSide < 0) sg.rotation.y = Math.PI;
+    sg.position.set(sgSide, 0, SPAWN_Z);
+    scene.add(sg);
+    activeObjs.push({ mesh: sg, type: 'decor', anim: null });
+    if (ms.text !== 'CHEGOU!') {
+      showFloat('\uD83D\uDEA7 JAU ' + ms.text, '#AAFFAA');
+    }
+    nextMilestone++;
+  }
+
+  var sc = speed * 60;
+  // Scroll static sign with road
+  if (staticSign) staticSign.position.z += sc * dt;
+  for (var mi = 0; mi < marks.length; mi++) {
+    marks[mi].position.z += sc * dt;
+    if (marks[mi].position.z > 12) marks[mi].position.z -= MCNT * MSPACE;
+  }
+  for (var ki = 0; ki < cones.length; ki++) {
+    cones[ki].m.position.z += sc * dt * 0.35;
+    if (cones[ki].m.position.z > 12) cones[ki].m.position.z -= CCNT * MSPACE * MCNT / CCNT;
+  }
+
+  for (var oi = 0; oi < activeObjs.length; oi++) {
+    activeObjs[oi].mesh.position.z += sc * dt;
+    var ot = activeObjs[oi].type;
+    if (ot === 'cig' || ot === 'pen') activeObjs[oi].mesh.rotation.y += dt * 1.5;
+  }
+
+  animMachines(dt);
+
+  // Tent spawn
+  tentTimer += dt;
+  var tentCd = health < 40 ? 5 : 12;
+  if (tentTimer > tentCd) { tentTimer = 0; spawnTent(); }
+
+  // Side decor
+  sideTimer += dt;
+  if (sideTimer > sideInt) { sideTimer = 0; sideInt = 4 + Math.random() * 4; spawnSide(); }
+
+  checkCols();
+  updHUD();
+  if (progress >= 1) startVictory();
+  renderer.render(scene, camera);
+}
+loop();
+
+// ── UI FUNCTIONS ──────────────────────────────────────────
+function showMenu() {
+  document.getElementById('ms').classList.add('on');
+  ['ns','ss','ds','es'].forEach(function(id){ document.getElementById(id).classList.remove('on'); });
+  document.getElementById('hud').classList.remove('on');
+  gs = 'menu';
+}
+function showName() {
+  document.getElementById('ns').classList.add('on');
+  ['ms','ss','ds','es'].forEach(function(id){ document.getElementById(id).classList.remove('on'); });
+  setTimeout(function(){ var el=document.getElementById('pname'); if(el) el.focus(); }, 150);
+}
+function confirmName() {
+  var v = document.getElementById('pname').value.trim();
+  playerName = v || 'Participante';
+  showSelect();
+}
+function showSelect() {
+  document.getElementById('ss').classList.add('on');
+  ['ms','ns','ds','es'].forEach(function(id){ document.getElementById(id).classList.remove('on'); });
+}
+function showDifficulty() {
+  document.getElementById('ds').classList.add('on');
+  ['ms','ns','ss','es'].forEach(function(id){ document.getElementById(id).classList.remove('on'); });
+}
+function selChar(c) {
+  chosenChar = c;
+  document.getElementById('cm').classList.toggle('sel', c === 'male');
+  document.getElementById('cf').classList.toggle('sel', c === 'female');
+  setTimeout(showDifficulty, 180); // auto-advance
+}
+function selectPhase(idx) {
+  chosenPhase = idx;
+  document.getElementById('d0').classList.toggle('dsel', idx === 0);
+  document.getElementById('d1').classList.toggle('dsel', idx === 1);
+  document.getElementById('d2').classList.toggle('dsel', idx === 2);
+  setTimeout(startGame, 200); // auto-start
+}
+function startGame() {
+  health = 100; cigsHit = 0; progress = 0; totalDist = 0;
+  curPhase = chosenPhase; phaseDist = 0;
+  speed = PHASES[chosenPhase].spd0;
+  walkT = 0; charX = 0; targetLaneX = 0; laneIdx = 1; laneCD = 0;
+  obTimer = 0; obInt = PHASES[chosenPhase].obMax;
+  tentTimer = 0; sideTimer = 0; sideInt = 5;
+  if (carObj) { scene.remove(carObj.g); carObj = null; }
+  for (var i = 0; i < activeObjs.length; i++) scene.remove(activeObjs[i].mesh);
+  activeObjs.length = 0;
+  document.getElementById('floats').innerHTML = '';
+  document.getElementById('df').style.opacity = '0';
+  document.getElementById('gf').style.opacity = '0';
+  document.getElementById('so').style.opacity = '0';
+  document.getElementById('pb').classList.remove('on');
+  scene.fog.color.setRGB(0.53, 0.81, 0.92);
+  // Reset static sign and milestones
+  staticSign.position.set(6.5, 0, -55);
+  nextMilestone = 1; // 0 is the static sign already placed
+  charData = buildChar(chosenChar === 'female');
+  ['ms','ss','ds','es'].forEach(function(id) { document.getElementById(id).classList.remove('on'); });
+  document.getElementById('hud').classList.add('on');
+  gs = 'playing';
+  updHUD();
+  clock.getDelta();
+  setTimeout(function() { showPhaseBanner(chosenPhase); }, 500);
+}
+function endGame() {
+  if (gs === 'end') return;
+  gs = 'end';
+  document.getElementById('hud').classList.remove('on');
+  document.getElementById('pb').classList.remove('on');
+  var trp, lbl, col;
+  if      (cigsHit === 0) { trp = '\uD83E\uDD47'; lbl = 'OURO \u2014 Impec\u00E1vel!';        col = '#FFD700'; }
+  else if (cigsHit <= 2)  { trp = '\uD83E\uDD48'; lbl = 'PRATA \u2014 Excelente!';            col = '#C0C0C0'; }
+  else if (cigsHit <= 5)  { trp = '\uD83E\uDD49'; lbl = 'BRONZE \u2014 Bom trabalho!';        col = '#CD7F32'; }
+  else                    { trp = '\uD83C\uDFC5'; lbl = 'PARTICIPA\u00C7\u00C3O!';            col = '#AAAAAA'; }
+  var score = Math.max(0, Math.round((1 - cigsHit/10) * 50 + (health/100) * 50));
+  document.getElementById('trp').textContent = trp;
+  document.getElementById('ename').textContent = playerName.toUpperCase();
+  document.getElementById('etitle').textContent = lbl;
+  document.getElementById('etitle').style.color = col;
+  var ph = PHASES[curPhase];
+  document.getElementById('estats').innerHTML =
+    'Fase alcan\u00E7ada: <b>' + ph.num + '</b><br>' +
+    'Cigarros atingidos: <b>' + cigsHit + '</b><br>' +
+    'Sa\u00FAde final: <b>' + Math.round(health) + '%</b><br>' +
+    'Pontua\u00E7\u00E3o: <b>' + score + '</b>';
+  document.getElementById('es').classList.add('on');
+}
+</script>
+</body>
+</html>
