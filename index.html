@@ -422,8 +422,8 @@ tr.total>td.k{background:var(--navy);color:#fff}
       <div class="card ch c6"><div class="card-h"><h3>Volume e tempo por mês</h3><span class="sub">barras = OTs · linha = tempo médio</span></div><div class="plot" id="c2"></div></div>
       <div class="card ch c6"><div class="card-h"><h3>Distribuição por faixa de tempo</h3><span class="sub">% das OTs confirmadas</span></div><div class="plot" id="c3"></div></div>
       <div class="card ch c6"><div class="card-h"><h3>Mix por destino</h3><span class="sub" id="s4"></span></div><div class="plot" id="c4"></div></div>
-      <div class="card ch c5"><div class="card-h"><h3>Volume × tempo por material</h3><span class="sub">cada ponto = 1 material</span></div><div class="plot" id="c5"></div></div>
-      <div class="card ch c7"><div class="card-h"><h3>Dia da semana × hora</h3><span class="sub">tempo médio de guarda</span></div><div class="plot" id="c6"></div></div>
+      <div class="card ch c12"><div class="card-h"><h3>Volume × tempo por material</h3><span class="sub">cada ponto = 1 material</span></div><div class="plot" id="c5"></div></div>
+      <div class="card ch c12"><div class="card-h"><h3>Dia da semana × hora</h3><span class="sub">tempo médio de guarda</span></div><div class="plot" id="c6"></div></div>
     </section>
 
     </div>
@@ -1420,7 +1420,7 @@ async function painelParaJPEG(){
     const imgs=[];
     for(const c of cards){
       const svg=c.querySelector('svg'), vb=svg.viewBox.baseVal;
-      imgs.push({img:await svgParaImagem(svg), w:vb.width, h:vb.height,
+      imgs.push({img:await svgParaImagem(svg), w:vb.width, h:vb.height, larga:c.classList.contains('c12'),
                  tit:c.querySelector('h3').textContent, leg:(c.querySelector('.legend')||{}).innerText||''});
     }
     const W=1280, pad=24, colW=(W-pad*3)/2;
@@ -1428,11 +1428,12 @@ async function painelParaJPEG(){
     const kpis=[['Tempo médio de guarda',dur(med)],['Acima da meta',a.c?nf1.format(100*a.fora/a.c)+'%':'—'],
       ['OTs no recorte',nf0.format(a.n)],['Metade guardada em',dur(quantil(a.hist,.5))],
       ['OTs em aberto',nf0.format(a.ab)],['Quantidade',nf0.format(a.q)]];
-    let y=78+16, linhas=[];
-    for(let i=0;i<imgs.length;i+=2){
-      const par=imgs.slice(i,i+2);
-      const alt=Math.max(...par.map(p=>p.h*colW/p.w))+(par.some(p=>p.leg)?16:0)+26;
-      linhas.push({par,alt}); }
+    let y=78+16, linhas=[], i=0;
+    while(i<imgs.length){
+      const par = imgs[i].larga ? [imgs[i]] : imgs.slice(i,i+2).filter(x=>!x.larga);
+      const lw = par.length===1&&par[0].larga ? W-pad*2 : colW;
+      const alt=Math.max(...par.map(p=>p.h*lw/p.w))+(par.some(p=>p.leg)?16:0)+26;
+      linhas.push({par,alt,lw}); i+=par.length; }
     const alturaKPI=76, alturaResumo=54;
     const H=78+alturaKPI+alturaResumo+linhas.reduce((s,l)=>s+l.alt+14,0)+34;
     const e=2, cv=document.createElement('canvas');
@@ -1458,11 +1459,11 @@ async function painelParaJPEG(){
     y+=alturaResumo-16;
     for(const L of linhas){
       L.par.forEach((p,i)=>{
-        const x=pad+i*(colW+pad), h=p.h*colW/p.w;
-        g.fillStyle='#fff'; g.fillRect(x,y,colW,L.alt);
+        const x=pad+i*(L.lw+pad), h=p.h*L.lw/p.w;
+        g.fillStyle='#fff'; g.fillRect(x,y,L.lw,L.alt);
         g.fillStyle='#0B1E3F'; g.font='700 12.5px Arial,Helvetica,sans-serif';
         g.fillText(p.tit,x+12,y+20);
-        g.drawImage(p.img,x+6,y+26,colW-12,h*(colW-12)/colW);
+        g.drawImage(p.img,x+6,y+26,L.lw-12,h*(L.lw-12)/L.lw);
         if(p.leg){ g.fillStyle='#8A9BA9'; g.font='10px Arial,Helvetica,sans-serif';
           g.fillText(p.leg.replace(/\n/g,' · ').slice(0,110),x+12,y+30+h); }
       });
@@ -1776,7 +1777,7 @@ function gDonut(id,itens){
 
 function gScatter(id,pts){
   const E=esq(id.slice(1)), n=$(id); if(pts.length<2){ n.innerHTML=vazio('Poucos materiais confirmados para dispersar.'); return; }
-  const w=larg(id), h=286, pl=52, pr=14, pt=14, pb=34, iw=w-pl-pr, ih=h-pt-pb;
+  const w=larg(id), h=w>900?360:286, pl=52, pr=16, pt=14, pb=34, iw=w-pl-pr, ih=h-pt-pb;
   const xs=ticks(Math.max(...pts.map(p=>p.x)),4), ys=ticks(Math.max(...pts.map(p=>p.y)),4);
   const xmax=xs[xs.length-1], ymax=ys[ys.length-1];
   const medX=mediana(pts.map(p=>p.x)), rmax=Math.max(...pts.map(p=>p.r))||1;
@@ -1805,19 +1806,20 @@ function gScatter(id,pts){
 /* mapa de calor: dia da semana × hora */
 function gHeat(id,grade,cont){
   const E=esq(id.slice(1)), n=$(id);
-  const w=larg(id), lw=64, cw=(w-lw-30)/24, ch=24, h=18+7*ch+30;
+  const w=larg(id), lw=64, cw=(w-lw-30)/24, ch=Math.round(Math.max(22,Math.min(38,cw*.68))), h=18+7*ch+32;
   let vs=[]; for(let d=0;d<7;d++) for(let x=0;x<24;x++) if(grade[d][x]!=null) vs.push(grade[d][x]);
   if(!vs.length){ n.innerHTML=vazio('Sem OTs confirmadas no recorte.'); return; }
   const max=Math.max(...vs), lim=Math.max(ST.sla*2,max*.9);
   const cor=v=>naRampa(E.rampa,v/lim);
   let s=svgAbre(w,h);
-  for(let x=0;x<24;x+=2) s+='<text class="axis" x="'+(lw+cw*x+cw/2)+'" y="12" text-anchor="middle">'+String(x).padStart(2,'0')+'</text>';
+  const passo=cw>=30?1:2;
+  for(let x=0;x<24;x+=passo) s+='<text class="axis" x="'+(lw+cw*x+cw/2)+'" y="12" text-anchor="middle">'+String(x).padStart(2,'0')+'h</text>';
   for(let d=0;d<7;d++){
     const y=18+d*ch;
     s+='<text class="axis" x="'+(lw-8)+'" y="'+(y+16)+'" text-anchor="end" fill="var(--ink)">'+DSEM[d].slice(0,3)+'</text>';
     for(let x=0;x<24;x++){
       const v=grade[d][x];
-      s+='<rect x="'+(lw+cw*x)+'" y="'+y+'" width="'+(cw-1.5)+'" height="'+(ch-2)+'" rx="2" fill="'+(v==null?'#F0F4F7':cor(v))+
+      s+='<rect x="'+(lw+cw*x)+'" y="'+y+'" width="'+(cw-2)+'" height="'+(ch-3)+'" rx="3" fill="'+(v==null?'#F0F4F7':cor(v))+
          '"'+(v==null?'':' data-tip="'+DSEM[d]+' · '+String(x).padStart(2,'0')+'h<br>Tempo médio <b>'+dur(v)+'</b><br>'+nf0.format(cont[d][x])+' OTs"')+'/>';
     }
   }
