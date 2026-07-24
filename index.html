@@ -256,7 +256,12 @@ tr.total>td.k{background:var(--navy);color:#fff}
 .pill.bad{background:#FBE9E7;color:#9B2C22}
 .foot{font-size:10.5px;color:var(--muted);padding:6px 10px}
 .periodo-campos{display:grid;grid-template-columns:1fr;gap:7px}
-.periodo-campos label{display:flex;flex-direction:column;gap:3px;font-size:10.5px;font-weight:650;color:var(--slate)}
+.periodo-bloco{display:flex;flex-direction:column;gap:4px}
+.periodo-titulo{font-size:10.5px;font-weight:700;color:var(--slate)}
+.periodo-linha{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.9fr);gap:6px}
+.periodo-linha label{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:9.5px;font-weight:650;color:var(--muted)}
+.periodo-linha .inp{width:100%;min-width:0;font-variant-numeric:tabular-nums}
+.periodo-linha .hora-digitada{text-align:center;letter-spacing:.02em}
 .periodo-ajuda{font-size:10.5px;line-height:1.35;color:var(--muted)}
 
 /* ---------------- MODAL ---------------- */
@@ -645,6 +650,24 @@ function dataHoraInput(ts){
   const d=new Date(ts);
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'T'+
     String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
+}
+function dataInput(ts){
+  if(ts==null||!isFinite(ts)) return '';
+  return iso(ts);
+}
+function horaInput(ts){
+  if(ts==null||!isFinite(ts)) return '';
+  const d=new Date(ts);
+  return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
+}
+function normalizarHoraDigitada(valor){
+  const s=String(valor==null?'':valor).trim();
+  if(!s) return '';
+  const m=s.match(/^(\d{1,2}):?(\d{2})(?::?(\d{2}))?$/);
+  if(!m) return null;
+  const h=+m[1], min=+m[2], seg=+(m[3]||0);
+  if(h>23||min>59||seg>59) return null;
+  return String(h).padStart(2,'0')+':'+String(min).padStart(2,'0')+':'+String(seg).padStart(2,'0');
 }
 function dataHoraBR(ts){
   return ts==null||!isFinite(ts) ? '—' : new Date(ts).toLocaleString('pt-BR',{
@@ -1940,9 +1963,16 @@ function renderFiltros(){
   let h='';
   h+=grupo('Período com data e hora',
       '<div class="periodo-campos">'+
-      '<label>Data e hora de início<input type="datetime-local" step="1" class="inp" id="fIni" value="'+dataHoraInput(ST.f.ini)+'" /></label>'+
-      '<label>Data e hora de fim<input type="datetime-local" step="1" class="inp" id="fFim" value="'+dataHoraInput(ST.f.fim)+'" /></label>'+
+      '<div class="periodo-bloco"><span class="periodo-titulo">Início</span><div class="periodo-linha">'+
+      '<label>Data<input type="date" class="inp" id="fIniData" value="'+dataInput(ST.f.ini)+'" /></label>'+
+      '<label>Hora<input type="text" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="8" class="inp hora-digitada" id="fIniHora" placeholder="HH:MM:SS" value="'+horaInput(ST.f.ini)+'" /></label>'+
+      '</div></div>'+
+      '<div class="periodo-bloco"><span class="periodo-titulo">Fim</span><div class="periodo-linha">'+
+      '<label>Data<input type="date" class="inp" id="fFimData" value="'+dataInput(ST.f.fim)+'" /></label>'+
+      '<label>Hora<input type="text" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="8" class="inp hora-digitada" id="fFimHora" placeholder="HH:MM:SS" value="'+horaInput(ST.f.fim)+'" /></label>'+
+      '</div></div>'+
       '</div><div class="periodo-ajuda">Usa a confirmação quando ela é válida e a criação nos demais casos.</div>'+
+      '<div class="periodo-ajuda">Digite a hora no formato HH:MM ou HH:MM:SS.</div>'+
       '<div class="periodo-ajuda"><b>Turnos:</b> 1º das 06:00 às 15:00, 2º das 15:00 às 23:45 e 3º das 21:50 às 06:00 do dia seguinte.</div>'+
       '<div class="quick"><button data-d="7">7 d</button><button data-d="30">30 d</button><button data-d="90">90 d</button>'+
       '<button data-d="180">6 m</button><button data-d="0"'+(ST.f.ini==null&&ST.f.fim==null?' class="on"':'')+'>Tudo</button></div>', true);
@@ -1986,31 +2016,59 @@ function renderFiltros(){
     const alvo=s.querySelector('[data-lista="'+CSS.escape(inp.dataset.alvo)+'"]'), t=inp.value.toLowerCase();
     alvo.querySelectorAll('.opt').forEach(o=>{ o.style.display=o.textContent.toLowerCase().includes(t)?'':'none'; });
   });
-  $('#fIni').onchange=$('#fFim').onchange=()=>{
-    const valorIni=$('#fIni').value, valorFim=$('#fFim').value;
-    const ini=valorIni?parseDT(valorIni):null;
-    const fim=valorFim?parseDT(valorFim):null;
-    if((valorIni&&!isFinite(ini))||(valorFim&&!isFinite(fim))){
-      toast('Revise a data e a hora informadas.');
-      $('#fIni').value=dataHoraInput(ST.f.ini); $('#fFim').value=dataHoraInput(ST.f.fim);
-      return;
+  function preencherPeriodo(){
+    $('#fIniData').value=dataInput(ST.f.ini);
+    $('#fIniHora').value=horaInput(ST.f.ini);
+    $('#fFimData').value=dataInput(ST.f.fim);
+    $('#fFimHora').value=horaInput(ST.f.fim);
+  }
+  function lerPeriodo(idData,idHora,rotulo){
+    const data=$(idData).value.trim(), horaOriginal=$(idHora).value.trim();
+    if(!data&&!horaOriginal) return {completo:true,valor:null};
+    if(!data||!horaOriginal) return {completo:false,valor:null};
+    const hora=normalizarHoraDigitada(horaOriginal);
+    if(hora==null) throw new Error('Digite a hora de '+rotulo+' no formato HH:MM ou HH:MM:SS.');
+    const valor=parseDT(data,hora);
+    if(!isFinite(valor)) throw new Error('Revise a data e a hora de '+rotulo+'.');
+    $(idHora).value=hora;
+    return {completo:true,valor};
+  }
+  function atualizarPeriodoDigitado(){
+    try{
+      const inicio=lerPeriodo('#fIniData','#fIniHora','início');
+      const fim=lerPeriodo('#fFimData','#fFimHora','fim');
+      if(!inicio.completo||!fim.completo) return;
+      if(inicio.valor!=null&&fim.valor!=null&&inicio.valor>fim.valor)
+        throw new Error('A data e hora de início precisam ser anteriores à data e hora de fim.');
+      ST.f.ini=inicio.valor;
+      ST.f.fim=fim.valor;
+      s.querySelectorAll('.quick button').forEach(b=>b.classList.remove('on'));
+      atualizar();
+    }catch(e){
+      toast(e.message);
+      preencherPeriodo();
     }
-    if(ini!=null&&fim!=null&&ini>fim){
-      toast('A data e hora de início precisam ser anteriores à data e hora de fim.');
-      $('#fIni').value=dataHoraInput(ST.f.ini); $('#fFim').value=dataHoraInput(ST.f.fim);
-      return;
-    }
-    ST.f.ini=ini;
-    ST.f.fim=fim;
-    s.querySelectorAll('.quick button').forEach(b=>b.classList.remove('on'));
-    atualizar();
-  };
+  }
+  ['#fIniData','#fIniHora','#fFimData','#fFimHora'].forEach(id=>{
+    $(id).onchange=atualizarPeriodoDigitado;
+  });
+  s.querySelectorAll('.hora-digitada').forEach(inp=>{
+    inp.oninput=debounce(()=>{
+      const digitado=inp.value.trim();
+      if(!/^\d{3,6}$/.test(digitado)) return;
+      const hora=normalizarHoraDigitada(digitado);
+      if(hora==null||hora==='') return;
+      inp.value=hora;
+      atualizarPeriodoDigitado();
+    },600);
+    inp.onkeydown=e=>{ if(e.key==='Enter') inp.blur(); };
+  });
   s.querySelectorAll('.quick button').forEach(b=>b.onclick=()=>{
     s.querySelectorAll('.quick button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
     const d=+b.dataset.d;
     ST.f.fim = d? ST.maxTs : null;
     ST.f.ini = d? ST.maxTs-d*86400000 : null;
-    $('#fIni').value=dataHoraInput(ST.f.ini); $('#fFim').value=dataHoraInput(ST.f.fim);
+    preencherPeriodo();
     atualizar();
   });
   $('#fSla').onchange=()=>{ ST.sla=Math.max(1,+$('#fSla').value||CFG.SLA_MIN); atualizar(); };
