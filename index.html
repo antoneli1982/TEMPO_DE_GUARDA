@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Tempo de Guarda — Analytics de Armazenagem</title>
 <meta name="application-version" content="2026.07.24_diretoria" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <style>
 /* ============================================================
    DESIGN TOKENS — ajuste aqui para alinhar 100% ao manual da marca
@@ -34,7 +37,7 @@
   --sh-1:0 1px 2px rgba(4,41,75,.06), 0 1px 3px rgba(4,41,75,.05);
   --sh-2:0 6px 24px rgba(4,41,75,.10);
   --side-w:286px;
-  --font:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  --font:'Poppins',Arial,sans-serif;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -1782,7 +1785,7 @@ function svgParaImagem(svg){
     const st=n.getAttribute('style'); if(st&&st.indexOf('var(')>=0) n.setAttribute('style',resolver(st));
   });
   const st=document.createElementNS('http://www.w3.org/2000/svg','style');
-  st.textContent='text{font-family:Arial,Helvetica,sans-serif}'+
+  st.textContent='text{font-family:Poppins,Arial,sans-serif}'+
     '.axis{fill:'+cs.getPropertyValue('--muted').trim()+';font-size:10.5px}'+
     '.axis-b{fill:'+cs.getPropertyValue('--slate').trim()+';font-size:11px;font-weight:600}'+
     '.gridline{stroke:'+cs.getPropertyValue('--line-2').trim()+';stroke-width:1}';
