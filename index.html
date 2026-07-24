@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Tempo de Guarda — Analytics de Armazenagem</title>
+<meta name="application-version" content="2026.07.24_diretoria" />
 <style>
 /* ============================================================
    DESIGN TOKENS — ajuste aqui para alinhar 100% ao manual da marca
@@ -215,19 +216,19 @@ svg text{font-family:var(--font)}
 .empty{padding:26px 14px;color:var(--muted);font-size:12.5px;text-align:center}
 
 /* ---------------- TABELA ---------------- */
-.tbar{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--line-2);flex-wrap:wrap}
+.tbar{display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid var(--line-2);flex-wrap:wrap}
 .tbar h3{margin:0;font-size:13px;font-weight:650}
 .tbar .sp{flex:1}
 .tbar .inp{width:auto;max-width:210px}
 .tscroll{overflow:auto;max-height:640px}
-table.pivot{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px}
-table.pivot th,table.pivot td{padding:6px 10px;white-space:nowrap;border-bottom:1px solid var(--line-2)}
+table.pivot{border-collapse:separate;border-spacing:0;width:100%;font-size:12px;line-height:1.2}
+table.pivot th,table.pivot td{padding:3px 8px;white-space:nowrap;border-bottom:1px solid var(--line-2)}
 table.pivot thead th{
   position:sticky;top:0;z-index:3;background:#fff;text-align:right;font-weight:650;color:var(--slate);
-  font-size:11px;letter-spacing:.02em;border-bottom:1px solid var(--line);cursor:pointer;user-select:none
+  font-size:10.5px;letter-spacing:.02em;border-bottom:1px solid var(--line);cursor:pointer;user-select:none
 }
 table.pivot thead th:hover{color:var(--blue)}
-table.pivot thead th.k{text-align:left;left:0;z-index:4;min-width:250px}
+table.pivot thead th.k{text-align:left;left:0;z-index:4;min-width:220px}
 table.pivot td.k{
   position:sticky;left:0;background:#fff;z-index:2;text-align:left;max-width:420px;overflow:hidden;text-overflow:ellipsis
 }
@@ -242,18 +243,21 @@ tr.leaf>td.k{color:var(--slate)}
 table.pivot td.flash,table.pivot thead th.flash{animation:piscacol 1.8s ease-out}
 tr.total>td{background:var(--navy);color:#fff;font-weight:650;border-bottom:none;position:sticky;bottom:0;z-index:5}
 tr.total>td.k{background:var(--navy);color:#fff}
-.tw{display:inline-flex;align-items:center;gap:6px}
-.caret{width:13px;flex:0 0 13px;color:var(--muted);font-size:9px;display:inline-block;text-align:center;cursor:pointer}
+.tw{display:inline-flex;align-items:center;gap:4px}
+.caret{width:11px;flex:0 0 11px;color:var(--muted);font-size:8px;display:inline-block;text-align:center;cursor:pointer}
 .caret.leafc{opacity:0;cursor:default}
 .dimtag{font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-right:6px}
 .databar{position:relative;display:inline-block;min-width:52px;text-align:right}
-.databar i{position:absolute;left:0;bottom:-3px;height:2.5px;background:var(--blue);opacity:.55;border-radius:2px}
+.databar i{position:absolute;left:0;bottom:-2px;height:2px;background:var(--blue);opacity:.55;border-radius:2px}
 .databar.over i{background:var(--red)}
 .pill{font-size:10.5px;font-weight:700;border-radius:20px;padding:1px 7px}
 .pill.ok{background:var(--green-soft);color:#1E6B39}
 .pill.mid{background:#FDF3E2;color:#8A5A0B}
 .pill.bad{background:#FBE9E7;color:#9B2C22}
-.foot{font-size:11px;color:var(--muted);padding:9px 14px}
+.foot{font-size:10.5px;color:var(--muted);padding:6px 10px}
+.periodo-campos{display:grid;grid-template-columns:1fr;gap:7px}
+.periodo-campos label{display:flex;flex-direction:column;gap:3px;font-size:10.5px;font-weight:650;color:var(--slate)}
+.periodo-ajuda{font-size:10.5px;line-height:1.35;color:var(--muted)}
 
 /* ---------------- MODAL ---------------- */
 .modal{position:fixed;inset:0;background:rgba(4,41,75,.55);display:none;z-index:100;padding:24px;overflow:auto}
@@ -466,7 +470,7 @@ tr.total>td.k{background:var(--navy);color:#fff}
       <div class="card ch c6"><div class="card-h"><h3>Distribuição por faixa de tempo</h3><span class="sub">% das OTs confirmadas</span></div><div class="plot" id="c3"></div></div>
       <div class="card ch c6"><div class="card-h"><h3>Mix por destino</h3><span class="sub" id="s4"></span></div><div class="plot" id="c4"></div></div>
       <div class="card ch c12"><div class="card-h"><h3>Volume × tempo por material</h3><span class="sub">cada ponto = 1 material</span></div><div class="plot" id="c5"></div></div>
-      <div class="card ch c12"><div class="card-h"><h3>Dia da semana × hora</h3><span class="sub">tempo médio de guarda</span></div><div class="plot" id="c6"></div></div>
+      <div class="card ch c12"><div class="card-h"><h3>Dia operacional × hora</h3><span class="sub">tempo médio de guarda</span></div><div class="plot" id="c6"></div></div>
     </section>
 
     </div>
@@ -516,8 +520,8 @@ tr.total>td.k{background:var(--navy);color:#fff}
       <div class="note"><b>Base compartilhada.</b> Ao abrir este arquivo, o painel busca automaticamente
         a base mais recente. Quando alguém carregar uma nova planilha, os outros navegadores recebem a atualização.</div>
       <div class="passos">
-        <div><b>1. Escolha o recorte</b><span>Na barra da esquerda: período, prédio, tipo de movimento, material.
-          O número azul ao lado de cada filtro mostra quantos itens você marcou.</span></div>
+        <div><b>1. Escolha o recorte</b><span>Na barra da esquerda, informe a data e a hora de início e de fim.
+          Depois, refine por prédio, tipo de movimento, material ou turno. O número azul mostra quantos itens você marcou.</span></div>
         <div><b>2. Escolha a página</b><span><b>Painel</b> mostra os indicadores e os gráficos, para leitura rápida.
           <b>Dados</b> mostra a tabela que você monta do seu jeito. Os filtros da esquerda valem para as duas.</span></div>
         <div><b>3. Monte a tabela</b><span>Na página Dados, em "Analisar por", clique em Prédio, Material, Usuário, Mês…
@@ -559,6 +563,13 @@ const CFG = {
 
 const DSEM = ['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'];
 const PAL = ['#1069B4','#78BE20','#E39A2B','#0E8C86','#5B5BD6','#D0463B','#0A3A63','#9BC7E4','#B0D77A','#8A9BA9','#C77DBB','#4FA3A0'];
+const TURNOS = {
+  '1': {rotulo:'1º Turno', inicio:6*60,    fim:15*60,   cruza:false},
+  '2': {rotulo:'2º Turno', inicio:15*60,   fim:23*60+45,cruza:false},
+  '3': {rotulo:'3º Turno', inicio:21*60+50,fim:6*60,    cruza:true}
+};
+const TURNO_SOBREPOSTO = 'Sobreposição 2º e 3º';
+const TURNO_SEM_DADO = 'Sem turno';
 
 /* ============================================================
    2. UTILITÁRIOS
@@ -613,11 +624,83 @@ function parseDT(d,h){
   let t=s.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);              // hora embutida na própria data
   if(!t && h) t=String(h).match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
   if(t){ hh=+t[1]; mi=+t[2]; ss=+(t[3]||0); }
-  else if(h){ const f=parseFloat(String(h).replace(',','.')); if(isFinite(f)&&f<1){ const sec=Math.round(f*86400); hh=Math.floor(sec/3600); mi=Math.floor(sec%3600/60); ss=sec%60; } }
-  return new Date(y,mo,da,hh,mi,ss).getTime();
+  else if(h){
+    const f=parseFloat(String(h).replace(',','.'));
+    if(isFinite(f)&&f>=0&&f<1){
+      const sec=Math.round(f*86400); hh=Math.floor(sec/3600); mi=Math.floor(sec%3600/60); ss=sec%60;
+    } else if(isFinite(f)&&f>=0&&f<24){
+      hh=Math.floor(f); mi=Math.floor((f-hh)*60); ss=Math.round((((f-hh)*60)-mi)*60);
+    }
+  }
+  if(mo<0||mo>11||da<1||hh<0||hh>23||mi<0||mi>59||ss<0||ss>59) return NaN;
+  const dt=new Date(y,mo,da,hh,mi,ss);
+  if(dt.getFullYear()!==y||dt.getMonth()!==mo||dt.getDate()!==da||
+     dt.getHours()!==hh||dt.getMinutes()!==mi||dt.getSeconds()!==ss) return NaN;
+  return dt.getTime();
 }
 const iso = ts => { const d=new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const soData = ts => { const d=new Date(ts); return new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime(); };
+function dataHoraInput(ts){
+  if(ts==null||!isFinite(ts)) return '';
+  const d=new Date(ts);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'T'+
+    String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
+}
+function dataHoraBR(ts){
+  return ts==null||!isFinite(ts) ? '—' : new Date(ts).toLocaleString('pt-BR',{
+    day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'
+  });
+}
+function normalizarTurno(v){
+  const s=semAcento(v==null?'':v).replace(/\s+/g,' ').trim();
+  if(!s) return null;
+  const n=s.match(/(^|\D)0*([123])(\D|$)/);
+  if(n) return n[2];
+  if(s.includes('primeir')) return '1';
+  if(s.includes('segund')) return '2';
+  if(s.includes('terceir')) return '3';
+  return null;
+}
+function turnoPorHorario(ts){
+  if(ts==null||!isFinite(ts)) return null;
+  const d=new Date(ts), m=d.getHours()*60+d.getMinutes();
+  if(m>=TURNOS['1'].inicio&&m<TURNOS['1'].fim) return '1';
+  if(m>=TURNOS['2'].inicio&&m<TURNOS['3'].inicio) return '2';
+  if(m>=TURNOS['3'].inicio&&m<TURNOS['2'].fim) return '23';
+  if(m>=TURNOS['2'].fim||m<TURNOS['3'].fim) return '3';
+  return null;
+}
+function horarioDentroTurno(ts,turno){
+  if(ts==null||!isFinite(ts)||!TURNOS[turno]) return false;
+  const d=new Date(ts), m=d.getHours()*60+d.getMinutes(), t=TURNOS[turno];
+  return t.cruza ? (m>=t.inicio||m<=t.fim) : (m>=t.inicio&&m<=t.fim);
+}
+function turnoInformadoConflita(ts,informado){
+  if(ts==null||!isFinite(ts)) return false;
+  const fonte=normalizarTurno(informado);
+  return fonte!=null&&!horarioDentroTurno(ts,fonte);
+}
+function turnoDoRegistro(ts,informado){
+  const fonte=normalizarTurno(informado);
+  if(fonte&&horarioDentroTurno(ts,fonte)) return fonte;
+  return turnoPorHorario(ts);
+}
+function rotuloTurno(turno){
+  return TURNOS[turno] ? TURNOS[turno].rotulo : turno==='23' ? TURNO_SOBREPOSTO : TURNO_SEM_DADO;
+}
+function dataInicioTurno(ts,turno){
+  if(ts==null||!isFinite(ts)) return null;
+  const d=new Date(ts), minuto=d.getHours()*60+d.getMinutes();
+  if(turno==='3'&&minuto<=TURNOS['3'].fim) d.setDate(d.getDate()-1);
+  d.setHours(0,0,0,0);
+  return d.getTime();
+}
+function colunaTurno(header,tipo){
+  const candidatos=header.map(c=>({c,n:semAcento(c)})).filter(x=>x.n.includes('turno'));
+  const termos=tipo==='conf' ? ['confirm','final','fim'] : ['entrada','cria','inicio'];
+  const achou=candidatos.find(x=>termos.some(t=>x.n.includes(t)));
+  return achou?achou.c:null;
+}
 function semanaISO(ts){
   const d=new Date(ts); d.setHours(0,0,0,0); d.setDate(d.getDate()+4-(d.getDay()||7));
   const y0=new Date(d.getFullYear(),0,1);
@@ -691,7 +774,9 @@ function autoMap(header){
    ============================================================ */
 const ST = {
   rows:[], colunas:[], mapa:{}, extras:[], exCols:[], abasArquivo:[], abaEscolhida:null, origem:'—', arquivo:'',
-  sla:CFG.SLA_MIN, minTs:0, maxTs:0, semConf:0, maisAntiga:null, abc:{},
+  turnCols:{cria:null,conf:null},
+  sla:CFG.SLA_MIN, minTs:0, maxTs:0, semConf:0, maisAntiga:null, turnoAmbiguo:0, turnoConflito:0,
+  linhasFonte:0, linhasDescartadas:0, dataCriaInvalida:0, dataConfInvalida:0, duracaoNegativa:0, abc:{},
   dims:['predio'], mets:['tmed'], rowsF:null,
   ver:{kpis:true,graficos:true,tabela:true}, filtrosAbertos:true, cores:{}, destaque:null,
   pagina:'painel', sujo:{painel:true,dados:true}, dimGraf:'predio',
@@ -982,15 +1067,22 @@ function montar(linhas, header){
   const M=ST.mapa, idx={}; header.forEach((h,i)=>idx[h]=i);
   const usadas=new Set(Object.values(M));
   const extrasCols = header.filter(h=>!usadas.has(h));
+  ST.turnCols={cria:colunaTurno(header,'cria'),conf:colunaTurno(header,'conf')};
   const IN=interner();
   const g=(L,c)=> c!=null&&idx[c]!=null ? (L[idx[c]]||'').trim() : '';
   const rows=[];
+  ST.linhasFonte=linhas.length; ST.linhasDescartadas=0; ST.dataCriaInvalida=0; ST.dataConfInvalida=0;
   for(let i=0;i<linhas.length;i++){
     const L=linhas[i];
-    const tsC=parseDT(g(L,M.dataCria), g(L,M.horaCria));
-    const tsF=parseDT(g(L,M.dataConf), g(L,M.horaConf));
+    const dataC=g(L,M.dataCria), horaC=g(L,M.horaCria), dataF=g(L,M.dataConf), horaF=g(L,M.horaConf);
+    const tsC=parseDT(dataC,horaC);
+    const tsF=parseDT(dataF,horaF);
     const tsG=parseDT(g(L,M.dataGR), null);
-    if(!isFinite(tsC)&&!isFinite(tsF)) continue;
+    const confInformada=!!(dataF||horaF);
+    const confInvalida=confInformada&&!isFinite(tsF);
+    if(!isFinite(tsC)) ST.dataCriaInvalida++;
+    if(confInvalida) ST.dataConfInvalida++;
+    if(!isFinite(tsC)&&!isFinite(tsF)){ ST.linhasDescartadas++; continue; }
     const ex={};
     for(const c of extrasCols) ex[c]=IN(g(L,c)||'—');
     rows.push({
@@ -1001,6 +1093,9 @@ function montar(linhas, header){
       tsC: isFinite(tsC)?tsC:null,
       tsF: isFinite(tsF)?tsF:null,
       tsG: isFinite(tsG)?tsG:null,
+      confInvalida,
+      turnoCInformado: IN(g(L,ST.turnCols.cria)||''),
+      turnoFInformado: IN(g(L,ST.turnCols.conf)||''),
       ex
     });
   }
@@ -1008,6 +1103,7 @@ function montar(linhas, header){
   ST.exCols=extrasCols;
   ST.extras=[];
   for(const c of extrasCols){
+    if(c===ST.turnCols.cria||c===ST.turnCols.conf) continue;
     const v=new Set(); let ok=true;
     for(const r of rows){ v.add(r.ex[c]); if(v.size>CFG.MAX_CARDINALIDADE_DIM){ ok=false; break; } }
     if(ok&&v.size>1) ST.extras.push(c);
@@ -1020,20 +1116,29 @@ function montar(linhas, header){
    6. MOTOR — tempo de guarda = confirmação − criação
    ============================================================ */
 function preparar(){
-  ST.minTs=Infinity; ST.maxTs=-Infinity; ST.semConf=0; ST.maisAntiga=null;
+  ST.minTs=Infinity; ST.maxTs=-Infinity; ST.semConf=0; ST.maisAntiga=null; ST.turnoAmbiguo=0; ST.turnoConflito=0; ST.duracaoNegativa=0;
   for(const r of ST.rows){
     r.min = (r.tsF!=null&&r.tsC!=null) ? (r.tsF-r.tsC)/60000 : null;   // minutos
-    if(r.min!=null&&r.min<0) r.min=null;                              // confirmação anterior à criação: inválido
+    if(r.min!=null&&r.min<0){ r.min=null; ST.duracaoNegativa++; }      // confirmação anterior à criação: inválido
     r.faixa = faixaDe(r.min);
     r.dias = (r.tsF!=null&&r.tsG!=null) ? Math.round((soData(r.tsF)-r.tsG)/86400000) : null;
-    r.aberta = r.tsF==null;
+    r.aberta = r.tsF==null&&!r.confInvalida;
     if(r.aberta){ ST.semConf++; if(r.tsC!=null&&(ST.maisAntiga==null||r.tsC<ST.maisAntiga)) ST.maisAntiga=r.tsC; }
     const ts = r.tsF!=null? r.tsF : r.tsC;                            // âncora: confirmação (ou criação, se aberta)
     r.ts=ts;
-    const d=new Date(ts);
+    r.turnoCConflito=turnoInformadoConflita(r.tsC,r.turnoCInformado);
+    r.turnoFConflito=turnoInformadoConflita(r.tsF,r.turnoFInformado);
+    r.turnoC=turnoDoRegistro(r.tsC,r.turnoCInformado);
+    r.turnoF=turnoDoRegistro(r.tsF,r.turnoFInformado);
+    r.turnoRef=r.tsF!=null?r.turnoF:r.turnoC;
+    if(r.turnoC==='23'||r.turnoF==='23') ST.turnoAmbiguo++;
+    if(r.turnoCConflito||r.turnoFConflito) ST.turnoConflito++;
+    r.diaTurno=dataInicioTurno(ts,r.turnoRef);
+    const d=new Date(r.diaTurno==null?ts:r.diaTurno);
     r.ano=String(d.getFullYear());
     r.mes=r.ano+'-'+String(d.getMonth()+1).padStart(2,'0');
-    r.dia=iso(ts); r.sem=semanaISO(ts); r.dsem=d.getDay(); r.horaF=d.getHours();
+    r.dia=iso(d.getTime()); r.sem=semanaISO(d.getTime()); r.dsem=d.getDay();
+    r.horaF = r.tsF!=null? new Date(r.tsF).getHours() : null;
     r.horaC = r.tsC!=null? new Date(r.tsC).getHours() : null;
     if(ts<ST.minTs)ST.minTs=ts; if(ts>ST.maxTs)ST.maxTs=ts;
   }
@@ -1057,14 +1162,16 @@ function dimensoes(){
     {id:'tipo',   lbl:'Tipo de movimento',   g:r=>r.tipo},
     {id:'abc',    lbl:'Curva ABC',           g:r=>ST.abc[r.material]||'—'},
     {id:'faixa',  lbl:'Faixa de tempo',      g:r=>r.faixa==null?'Sem confirmação':faixaNome(r.faixa), o:r=>r.faixa==null?99:r.faixa},
-    {id:'status', lbl:'Situação',            g:r=>r.aberta?'Em aberto':'Confirmada'},
+    {id:'status', lbl:'Situação',            g:r=>r.confInvalida?'Confirmação inválida':r.aberta?'Em aberto':'Confirmada'},
     {id:'ano',    lbl:'Ano',                 g:r=>r.ano},
     {id:'mes',    lbl:'Mês',                 g:r=>r.mes},
     {id:'sem',    lbl:'Semana',              g:r=>r.sem},
-    {id:'dia',    lbl:'Dia',                 g:r=>r.dia},
+    {id:'dia',    lbl:'Dia operacional',     g:r=>r.dia},
     {id:'dsem',   lbl:'Dia da semana',       g:r=>DSEM[r.dsem], o:r=>r.dsem},
+    {id:'turnoF', lbl:'Turno da confirmação',g:r=>rotuloTurno(r.turnoF), o:r=>r.turnoF==='1'?1:r.turnoF==='2'?2:r.turnoF==='3'?3:r.turnoF==='23'?4:99},
+    {id:'turnoE', lbl:'Turno da entrada',    g:r=>rotuloTurno(r.turnoC), o:r=>r.turnoC==='1'?1:r.turnoC==='2'?2:r.turnoC==='3'?3:r.turnoC==='23'?4:99},
     {id:'horaC',  lbl:'Hora da criação',     g:r=>r.horaC==null?'—':String(r.horaC).padStart(2,'0')+'h', o:r=>r.horaC==null?99:r.horaC},
-    {id:'horaF',  lbl:'Hora da confirmação', g:r=>String(r.horaF).padStart(2,'0')+'h', o:r=>r.horaF}
+    {id:'horaF',  lbl:'Hora da confirmação', g:r=>r.horaF==null?'—':String(r.horaF).padStart(2,'0')+'h', o:r=>r.horaF==null?99:r.horaF}
   ];
   for(const k of ST.extras) b.push({id:'ex:'+k, lbl:k, g:r=>r.ex[k]||'—'});
   _dimCache=b; return b;
@@ -1687,8 +1794,8 @@ function faixaMarca(g,W,titulo,sub){
 }
 function recorteTexto(){
   const f=ST.f, p=[];
-  p.push((f.ini?new Date(f.ini).toLocaleDateString('pt-BR'):new Date(ST.minTs).toLocaleDateString('pt-BR'))+' a '+
-         (f.fim?new Date(f.fim).toLocaleDateString('pt-BR'):new Date(ST.maxTs).toLocaleDateString('pt-BR')));
+  p.push((f.ini!=null?dataHoraBR(f.ini):dataHoraBR(ST.minTs))+' a '+
+         (f.fim!=null?dataHoraBR(f.fim):dataHoraBR(ST.maxTs)));
   for(const id in f.sets){ const s=f.sets[id]; if(s&&s.size){ const d=dimPorId(id); p.push((d?d.lbl:id)+': '+[...s].slice(0,3).join(', ')+(s.size>3?' +'+(s.size-3):'')); } }
   if(f.faixas.size) p.push('faixas: '+[...f.faixas].map(faixaNome).join(', '));
   if(f.soAtraso) p.push('só acima da meta');
@@ -1816,11 +1923,12 @@ function grupo(titulo, corpo, aberto){
 }
 function listaHTML(dimId, itens){
   const tot=itens.length, mostra=itens.slice(0,CFG.MAX_OPCOES_FILTRO);
+  const ativos=ST.f.sets[dimId]||new Set();
   let h='';
   if(tot>12) h+='<input class="inp busca" placeholder="Buscar entre '+nf0.format(tot)+'…" data-alvo="'+esc(dimId)+'" />';
   h+='<div class="list" data-lista="'+esc(dimId)+'">';
   for(const [v,n] of mostra)
-    h+='<label class="opt"><input type="checkbox" data-dim="'+esc(dimId)+'" value="'+esc(v)+'" /><span class="t">'+esc(v)+
+    h+='<label class="opt"><input type="checkbox" data-dim="'+esc(dimId)+'" value="'+esc(v)+'"'+(ativos.has(String(v))?' checked':'')+' /><span class="t">'+esc(v)+
        '</span><span class="q">'+nf0.format(n)+'</span></label>';
   h+='</div>';
   if(tot>mostra.length) h+='<div style="font-size:10.5px;color:var(--muted);padding:3px 2px">mostrando os '+nf0.format(mostra.length)+' mais frequentes · use a busca</div>';
@@ -1830,10 +1938,14 @@ function renderFiltros(){
   const s=$('#side');
   if(!ST.rows.length){ s.innerHTML='<div style="padding:20px 4px;color:var(--muted);font-size:12.5px">Carregue o CSV para liberar os filtros.</div>'; return; }
   let h='';
-  h+=grupo('Período (data de confirmação)',
-      '<div class="row2"><input type="date" class="inp" id="fIni" /><input type="date" class="inp" id="fFim" /></div>'+
+  h+=grupo('Período com data e hora',
+      '<div class="periodo-campos">'+
+      '<label>Data e hora de início<input type="datetime-local" step="1" class="inp" id="fIni" value="'+dataHoraInput(ST.f.ini)+'" /></label>'+
+      '<label>Data e hora de fim<input type="datetime-local" step="1" class="inp" id="fFim" value="'+dataHoraInput(ST.f.fim)+'" /></label>'+
+      '</div><div class="periodo-ajuda">Usa a confirmação quando ela é válida e a criação nos demais casos.</div>'+
+      '<div class="periodo-ajuda"><b>Turnos:</b> 1º das 06:00 às 15:00, 2º das 15:00 às 23:45 e 3º das 21:50 às 06:00 do dia seguinte.</div>'+
       '<div class="quick"><button data-d="7">7 d</button><button data-d="30">30 d</button><button data-d="90">90 d</button>'+
-      '<button data-d="180">6 m</button><button data-d="0" class="on">Tudo</button></div>', true);
+      '<button data-d="180">6 m</button><button data-d="0"'+(ST.f.ini==null&&ST.f.fim==null?' class="on"':'')+'>Tudo</button></div>', true);
   const feitos=new Set();
   for(const at of ORDEM_FILTROS){
     const id=idReal(at), d=dimPorId(id);
@@ -1849,14 +1961,14 @@ function renderFiltros(){
     h+=grupo(k, listaHTML(id,it), false);
   }
   let fx='<div class="list" style="max-height:none">';
-  CFG.FAIXAS.forEach((_,i)=>{ fx+='<label class="opt"><input type="checkbox" data-faixa="'+i+'" /><span class="t">'+faixaNome(i)+'</span></label>'; });
+  CFG.FAIXAS.forEach((_,i)=>{ fx+='<label class="opt"><input type="checkbox" data-faixa="'+i+'"'+(ST.f.faixas.has(i)?' checked':'')+' /><span class="t">'+faixaNome(i)+'</span></label>'; });
   h+=grupo('Faixa de tempo de guarda', fx+'</div>', false);
   h+=grupo('Meta e recortes',
       '<label style="font-size:11px;font-weight:600;color:var(--slate)">Meta de tempo de guarda (minutos)</label>'+
       '<input type="number" class="inp" id="fSla" min="1" step="5" value="'+ST.sla+'" />'+
-      '<label class="togline"><input type="checkbox" id="fAtraso" /> Mostrar só o que passou da meta</label>'+
-      '<label class="togline"><input type="checkbox" id="fAberta" /> Mostrar só OTs em aberto</label>'+
-      '<input class="inp" id="fBusca" placeholder="Busca livre (material, prédio)" />', true);
+      '<label class="togline"><input type="checkbox" id="fAtraso"'+(ST.f.soAtraso?' checked':'')+' /> Mostrar só o que passou da meta</label>'+
+      '<label class="togline"><input type="checkbox" id="fAberta"'+(ST.f.soAberta?' checked':'')+' /> Mostrar só OTs em aberto</label>'+
+      '<input class="inp" id="fBusca" placeholder="Busca livre (material, prédio)" value="'+esc(ST.f.busca)+'" />', true);
   h+='<div class="side-foot"><button class="btn mini" id="fLimpar">Limpar filtros</button></div>';
   s.innerHTML=h;
 
@@ -1875,8 +1987,21 @@ function renderFiltros(){
     alvo.querySelectorAll('.opt').forEach(o=>{ o.style.display=o.textContent.toLowerCase().includes(t)?'':'none'; });
   });
   $('#fIni').onchange=$('#fFim').onchange=()=>{
-    ST.f.ini=$('#fIni').value?parseDT($('#fIni').value):null;
-    ST.f.fim=$('#fFim').value?parseDT($('#fFim').value)+86399999:null;
+    const valorIni=$('#fIni').value, valorFim=$('#fFim').value;
+    const ini=valorIni?parseDT(valorIni):null;
+    const fim=valorFim?parseDT(valorFim):null;
+    if((valorIni&&!isFinite(ini))||(valorFim&&!isFinite(fim))){
+      toast('Revise a data e a hora informadas.');
+      $('#fIni').value=dataHoraInput(ST.f.ini); $('#fFim').value=dataHoraInput(ST.f.fim);
+      return;
+    }
+    if(ini!=null&&fim!=null&&ini>fim){
+      toast('A data e hora de início precisam ser anteriores à data e hora de fim.');
+      $('#fIni').value=dataHoraInput(ST.f.ini); $('#fFim').value=dataHoraInput(ST.f.fim);
+      return;
+    }
+    ST.f.ini=ini;
+    ST.f.fim=fim;
     s.querySelectorAll('.quick button').forEach(b=>b.classList.remove('on'));
     atualizar();
   };
@@ -1885,7 +2010,7 @@ function renderFiltros(){
     const d=+b.dataset.d;
     ST.f.fim = d? ST.maxTs : null;
     ST.f.ini = d? ST.maxTs-d*86400000 : null;
-    $('#fIni').value=ST.f.ini?iso(ST.f.ini):''; $('#fFim').value=ST.f.fim?iso(ST.f.fim):'';
+    $('#fIni').value=dataHoraInput(ST.f.ini); $('#fFim').value=dataHoraInput(ST.f.fim);
     atualizar();
   });
   $('#fSla').onchange=()=>{ ST.sla=Math.max(1,+$('#fSla').value||CFG.SLA_MIN); atualizar(); };
@@ -2216,7 +2341,8 @@ function renderGraficos(rows){
   for(let d=0;d<7;d++){ grade.push(new Array(24).fill(null)); cont.push(new Array(24).fill(0)); soma.push(new Array(24).fill(0)); }
   for(const r of rows){
     if(r.min==null||r.horaC==null||r.tsC==null) continue;
-    const d=new Date(r.tsC).getDay(), x=r.horaC;
+    const inicioTurno=dataInicioTurno(r.tsC,r.turnoC);
+    const d=new Date(inicioTurno==null?r.tsC:inicioTurno).getDay(), x=r.horaC;
     soma[d][x]+=r.min; cont[d][x]++;
   }
   for(let d=0;d<7;d++) for(let x=0;x<24;x++) if(cont[d][x]) grade[d][x]=soma[d][x]/cont[d][x];
@@ -2244,7 +2370,7 @@ function renderTabela(){
   else if(!linhas.length) tb+=aviso('Nenhuma linha atende aos filtros escolhidos.');
   for(const no of (mets.length?linhas:[])){
     const ab=ST.aberto.has(no.path), folha=!no.ch.size;
-    let td='<td class="k" style="padding-left:'+(10+no.lvl*16)+'px"><span class="tw"><span class="caret'+(folha?' leafc':'')+
+    let td='<td class="k" style="padding-left:'+(8+no.lvl*13)+'px"><span class="tw"><span class="caret'+(folha?' leafc':'')+
       '" data-p="'+esc(no.path)+'">'+(folha?'•':(ab?'▼':'▶'))+'</span>'+
       esc(no.key)+'</span></td>';
     for(const m of mets) td+=celula(m,no.a,raiz.a,maxBar[m.id]);
@@ -2268,7 +2394,13 @@ function renderTabela(){
   $('#tCombos').textContent = dims.length? nf0.format(contarCombinacoes(raiz))+' combinações · '+nf0.format(linhas.length)+' linhas na tela' : '';
   $('#tFoot').innerHTML='O tempo de guarda é a diferença entre a confirmação e a criação da ordem de transporte. '+
     'OTs ainda não confirmadas são contadas em <b>Em aberto</b> e ficam fora do cálculo do tempo médio.'+
-    (ST.semConf?' Nesta base são '+nf0.format(ST.semConf)+' OTs em aberto.':'');
+    (ST.semConf?' Nesta base são '+nf0.format(ST.semConf)+' OTs em aberto.':'')+
+    (ST.linhasDescartadas?' <b>Atenção:</b> '+nf0.format(ST.linhasDescartadas)+' linhas foram descartadas por não terem data válida de criação nem de confirmação.':'')+
+    (ST.dataCriaInvalida?' <b>Atenção:</b> '+nf0.format(ST.dataCriaInvalida)+' registros estão sem data válida de criação e não entram no cálculo do tempo.':'')+
+    (ST.dataConfInvalida?' <b>Atenção:</b> '+nf0.format(ST.dataConfInvalida)+' registros possuem confirmação preenchida com data ou hora inválida.':'')+
+    (ST.duracaoNegativa?' <b>Atenção:</b> '+nf0.format(ST.duracaoNegativa)+' registros têm confirmação anterior à criação e não entram no cálculo do tempo.':'')+
+    (ST.turnoAmbiguo?' <b>Atenção:</b> '+nf0.format(ST.turnoAmbiguo)+' registros estão no intervalo comum ao 2º e ao 3º turno sem turno válido informado.':'')+
+    (ST.turnoConflito?' <b>Atenção:</b> '+nf0.format(ST.turnoConflito)+' registros têm turno informado incompatível com o horário e foram classificados pelo horário.':'');
 }
 function celula(m,a,raiz,maxb){
   const fl=ST.destaque===m.id?' class="flash"':'';
@@ -2291,8 +2423,8 @@ function renderResumo(){
   $('#resumo').innerHTML=t;
 }
 function renderRodape(rows){
-  $('#cubeFoot').innerHTML='Base: <b>'+esc(ST.origem)+'</b> · período <b>'+
-    new Date(ST.minTs).toLocaleDateString('pt-BR')+'</b> a <b>'+new Date(ST.maxTs).toLocaleDateString('pt-BR')+
+  $('#cubeFoot').innerHTML='Base: <b>'+esc(ST.origem)+'</b> · período da base <b>'+
+    dataHoraBR(ST.minTs)+'</b> a <b>'+dataHoraBR(ST.maxTs)+
     '</b> · OTs no recorte <b>'+nf0.format(rows.length)+'</b> de '+nf0.format(ST.rows.length)+
     ' · dimensões ativas <b>'+ST.dims.length+'</b> · métricas <b>'+ST.mets.length+'</b>';
 }
@@ -2330,7 +2462,7 @@ function valorExcel(m,a){
 }
 function abaParametros(){
   const f=ST.f, filtros=[];
-  if(f.ini||f.fim) filtros.push(['Período',(f.ini?new Date(f.ini).toLocaleDateString('pt-BR'):'início da base')+' a '+(f.fim?new Date(f.fim).toLocaleDateString('pt-BR'):'fim da base')]);
+  if(f.ini!=null||f.fim!=null) filtros.push(['Período',(f.ini!=null?dataHoraBR(f.ini):'início da base')+' a '+(f.fim!=null?dataHoraBR(f.fim):'fim da base')]);
   for(const id in f.sets){ const s=f.sets[id]; if(s&&s.size){ const d=dimPorId(id); filtros.push([d?d.lbl:id,[...s].join(', ').slice(0,400)]); } }
   if(f.faixas.size) filtros.push(['Faixa de tempo',[...f.faixas].map(faixaNome).join(', ')]);
   if(f.soAtraso) filtros.push(['Recorte','somente OTs acima do SLA']);
@@ -2340,13 +2472,24 @@ function abaParametros(){
     ['Arquivo de origem',ST.arquivo||'—'],
     ['Gerado em',new Date().toLocaleString('pt-BR')],
     ['Definição do indicador','Tempo de guarda = data e hora da confirmação menos data e hora da criação da ordem de transporte'],
+    ['Referência do filtro de período','data e hora da confirmação quando válida; data e hora da criação nos demais casos'],
+    ['Turnos operacionais','1º turno: 06:00 a 15:00; 2º turno: 15:00 a 23:45; 3º turno: 21:50 a 06:00 do dia seguinte'],
+    ['Sobreposição dos turnos','Entre 21:50 e 23:45, usa o turno válido informado no arquivo. Sem essa informação, o registro fica identificado para conferência.'],
+    ['Data operacional','No 3º turno, registros entre 00:00 e 06:00 pertencem à data em que o turno começou.'],
+    ['Registros no intervalo comum sem turno válido',nf0.format(ST.turnoAmbiguo)],
+    ['Registros com turno informado incompatível',nf0.format(ST.turnoConflito)],
+    ['Linhas recebidas da fonte',nf0.format(ST.linhasFonte)],
+    ['Linhas descartadas sem data válida',nf0.format(ST.linhasDescartadas)],
+    ['Registros sem data válida de criação',nf0.format(ST.dataCriaInvalida)],
+    ['Registros com confirmação preenchida e inválida',nf0.format(ST.dataConfInvalida)],
+    ['Registros com confirmação anterior à criação',nf0.format(ST.duracaoNegativa)],
     ['Unidade dos tempos','minutos'],
     ['SLA aplicado',ST.sla+' minutos'],
     ['Guarda imediata','até '+CFG.IMEDIATO_MIN+' minutos'],
     ['Tratamento de OT sem confirmação','fora de médias, medianas e percentis; contada na coluna Em aberto'],
     ['Linhas na base',nf0.format(ST.rows.length)],
     ['Linhas no recorte',nf0.format(ST.arv.a.n)],
-    ['Período da base',new Date(ST.minTs).toLocaleDateString('pt-BR')+' a '+new Date(ST.maxTs).toLocaleDateString('pt-BR')],
+    ['Período da base',dataHoraBR(ST.minTs)+' a '+dataHoraBR(ST.maxTs)],
     ['',''],['FILTROS APLICADOS','']
   ].concat(filtros.length?filtros:[['(nenhum filtro ativo)','']]);
   return {nome:'Parâmetros',cols:[{lbl:'Item',tipo:'txt',larg:34},{lbl:'Valor',tipo:'txt',larg:86}],linhas};
@@ -2493,6 +2636,9 @@ function concluir(header,linhas,nome,t0,mapaPreferido,remota){
     return false;
   }
   $('#vazio').style.display='none'; $('#painel').style.display='';
+  ST.f={ini:null,fim:null,sets:{},faixas:new Set(),soAtraso:false,soAberta:false,busca:''};
+  ST.tbusca='';
+  if($('#tSearch')) $('#tSearch').value='';
   ST.dims=[idReal('predio')].filter(id=>dimPorId(id));
   if(!ST.dims.length) ST.dims=['predio'];
   ST.dimGraf=ST.dims[0]; ST.pagina='painel';
