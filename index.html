@@ -62,6 +62,14 @@ button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit
 .sep-v{width:1px;height:22px;background:rgba(255,255,255,.28);flex:0 0 1px}
 .brand b{display:block;font-size:14.5px;font-weight:650;letter-spacing:-.01em;line-height:1.15}
 .brand span{display:block;font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:#8FB3CE}
+.abas{display:flex;gap:2px;background:rgba(255,255,255,.12);border-radius:var(--r);padding:3px;margin-left:6px}
+.aba{
+  border:0;background:transparent;color:#B9CBE0;border-radius:5px;padding:5px 15px;font-size:12.5px;
+  font-weight:600;cursor:pointer;transition:.14s;white-space:nowrap
+}
+.aba:hover{color:#fff}
+.aba.on{background:#fff;color:var(--navy)}
+@media(max-width:640px){ .aba{padding:5px 10px;font-size:11.5px} }
 .top-actions{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .btn{
   border:1px solid transparent;border-radius:var(--r);padding:7px 13px;font-size:12.5px;font-weight:600;
@@ -75,6 +83,20 @@ button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit
 .btn.mini:hover{border-color:var(--blue);color:var(--blue)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 #burger{display:inline-flex}
+.syncbox{
+  display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.28);
+  border-radius:20px;padding:5px 10px;color:#D7E3F0;background:rgba(255,255,255,.08);
+  font-size:11.5px;font-weight:650;white-space:nowrap;max-width:190px
+}
+.syncbox .syncdot{width:8px;height:8px;border-radius:50%;background:#A9BBC9;flex:0 0 8px}
+.syncbox span:last-child{overflow:hidden;text-overflow:ellipsis}
+.syncbox.ok{border-color:rgba(120,190,32,.6);color:#F4FFE8}
+.syncbox.ok .syncdot{background:#78BE20;box-shadow:0 0 0 3px rgba(120,190,32,.18)}
+.syncbox.busy{border-color:rgba(227,154,43,.65);color:#FFF4DF}
+.syncbox.busy .syncdot{background:#E39A2B;animation:pulseSync 1s ease-in-out infinite}
+.syncbox.off,.syncbox.error{border-color:rgba(208,70,59,.7);color:#FFE9E6}
+.syncbox.off .syncdot,.syncbox.error .syncdot{background:#F06B60}
+@keyframes pulseSync{50%{opacity:.35}}
 
 /* ---------------- LAYOUT ---------------- */
 .shell{display:flex;align-items:flex-start;min-height:calc(100vh - 58px)}
@@ -160,6 +182,13 @@ button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit
 .chip.v{border-color:var(--line);font-weight:600}
 .chip.v.on{background:var(--blue-soft);border-color:var(--brand);color:var(--navy)}
 .cubeline>.eyebrow i{display:block;font-style:normal;font-weight:500;letter-spacing:0;text-transform:none;font-size:10.5px;color:#A9B8C4;margin-top:2px;line-height:1.3}
+.verbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 2px}
+.dica-pg{font-size:11.5px;color:var(--muted);margin-left:auto}
+.selmini{
+  border:1px solid var(--line);border-radius:var(--r-sm);padding:3px 7px;font-size:12.5px;
+  color:var(--navy);background:#fff;font-weight:600;max-width:200px;cursor:pointer
+}
+.selmini:hover{border-color:var(--brand)}
 .resumo{
   background:var(--blue-soft);border-radius:var(--r);padding:9px 12px;font-size:12.5px;color:#1B3E5C;line-height:1.55
 }
@@ -340,8 +369,15 @@ tr.total>td.k{background:var(--navy);color:#fff}
     <span class="sep-v"></span>
     <div><b>Tempo de Guarda</b><span>Ordens de transporte · put-away</span></div>
   </div>
+  <nav class="abas" id="abas">
+    <button class="aba on" data-p="painel">Painel</button>
+    <button class="aba" data-p="dados">Dados</button>
+  </nav>
   <div class="top-actions">
-    <label class="btn ghost" for="file">Carregar CSV</label>
+    <div class="syncbox busy" id="syncBox" title="Conectando ao banco compartilhado">
+      <span class="syncdot"></span><span id="syncTxt">Conectando</span>
+    </div>
+    <label class="btn ghost" for="file">Atualizar base</label>
     <input type="file" id="file" hidden accept=".csv,.txt,.tsv,.xlsx,.xlsm,.xltx,.xltm" />
     <button class="btn ghost" id="btnGuia">Como usar</button>
     <button class="btn ghost" id="btnMap">Colunas</button>
@@ -367,7 +403,8 @@ tr.total>td.k{background:var(--navy);color:#fff}
       <div class="drop">
         <h2>Carregue o extrato de ordens de transporte</h2>
         <p>Arraste o arquivo <b>.xlsm</b>, <b>.xlsx</b> ou <b>.csv</b> para esta área, ou use o botão abaixo.
-           Nada sai do seu computador: a leitura e o cálculo acontecem dentro do navegador.</p>
+           A leitura acontece no navegador e, depois, a base é sincronizada com o Firebase para aparecer
+           automaticamente nos demais navegadores.</p>
         <label class="btn solid" for="file" style="cursor:pointer">Selecionar arquivo</label>
         <div class="cols">Colunas reconhecidas automaticamente: <code>Predio</code> <code>Material</code>
           <code>Data de criação</code> <code>Hora da criação</code> <code>Data da confirmação</code>
@@ -378,8 +415,15 @@ tr.total>td.k{background:var(--navy);color:#fff}
     </section>
 
     <div id="painel" style="display:none;flex-direction:column;gap:14px">
+
+    <div id="pgPainel" style="display:flex;flex-direction:column;gap:14px">
+    <div class="verbar"><span class="eyebrow">Mostrar no painel</span><div class="chips" id="verChips"></div>
+      <span class="dica-pg">Os filtros da esquerda valem para as duas páginas.</span></div>
     <section class="kpis" id="kpis"></section>
 
+    </div>
+
+    <div id="pgDados" style="display:none;flex-direction:column;gap:14px">
     <section class="card cube">
       <div class="cubeline">
         <span class="eyebrow">Analisar por<i>o número mostra a ordem dos níveis da tabela</i></span>
@@ -397,10 +441,6 @@ tr.total>td.k{background:var(--navy);color:#fff}
           <button class="btn mini" id="metNone">Esconder todas</button>
         </div>
       </div>
-      <div class="cubeline">
-        <span class="eyebrow">Mostrar na tela</span>
-        <div class="chips" id="verChips"></div>
-      </div>
       <div class="resumo" id="resumo"></div>
       <div class="cubefoot" id="cubeFoot"></div>
     </section>
@@ -417,8 +457,11 @@ tr.total>td.k{background:var(--navy);color:#fff}
       <div class="tscroll"><table class="pivot" id="pivot"></table></div>
       <div class="foot" id="tFoot"></div>
     </section>
+    </div>
+
+    <div id="pgGraficos" style="display:flex;flex-direction:column;gap:14px">
     <section class="charts" id="charts">
-      <div class="card ch c6"><div class="card-h"><h3>Tempo de guarda</h3><span class="sub" id="s1"></span></div><div class="plot" id="c1"></div></div>
+      <div class="card ch c6"><div class="card-h"><h3>Tempo médio por</h3><select class="selmini" id="selDimGraf" title="Escolha o agrupamento deste gráfico"></select></div><div class="plot" id="c1"></div></div>
       <div class="card ch c6"><div class="card-h"><h3>Volume e tempo por mês</h3><span class="sub">barras = OTs · linha = tempo médio</span></div><div class="plot" id="c2"></div></div>
       <div class="card ch c6"><div class="card-h"><h3>Distribuição por faixa de tempo</h3><span class="sub">% das OTs confirmadas</span></div><div class="plot" id="c3"></div></div>
       <div class="card ch c6"><div class="card-h"><h3>Mix por destino</h3><span class="sub" id="s4"></span></div><div class="plot" id="c4"></div></div>
@@ -470,16 +513,20 @@ tr.total>td.k{background:var(--navy);color:#fff}
       <div class="note"><b>O que este painel mede.</b> O tempo de guarda é quanto tempo passou entre o sistema
         criar a ordem de transporte e o operador confirmar que o material foi guardado no endereço.
         O indicador principal é o <b>tempo médio</b>.</div>
+      <div class="note"><b>Base compartilhada.</b> Ao abrir este arquivo, o painel busca automaticamente
+        a base mais recente. Quando alguém carregar uma nova planilha, os outros navegadores recebem a atualização.</div>
       <div class="passos">
         <div><b>1. Escolha o recorte</b><span>Na barra da esquerda: período, prédio, tipo de movimento, material.
           O número azul ao lado de cada filtro mostra quantos itens você marcou.</span></div>
-        <div><b>2. Escolha como quer ver</b><span>Em "Analisar por", clique em Prédio, Material, Usuário, Mês…
-          A ordem dos cliques vira a hierarquia da tabela: 1 é o primeiro nível, 2 abre dentro dele.</span></div>
-        <div><b>3. Escolha as colunas</b><span>Em "Colunas da tabela", clique para mostrar ou esconder.
+        <div><b>2. Escolha a página</b><span><b>Painel</b> mostra os indicadores e os gráficos, para leitura rápida.
+          <b>Dados</b> mostra a tabela que você monta do seu jeito. Os filtros da esquerda valem para as duas.</span></div>
+        <div><b>3. Monte a tabela</b><span>Na página Dados, em "Analisar por", clique em Prédio, Material, Usuário, Mês…
+          A ordem dos cliques vira a hierarquia: 1 é o primeiro nível, 2 abre dentro dele.</span></div>
+        <div><b>4. Escolha as colunas</b><span>Em "Colunas da tabela", clique para mostrar ou esconder.
           Passe o mouse em cada uma para ler o que ela significa.</span></div>
-        <div><b>4. Limpe a tela</b><span>Em "Mostrar na tela", desligue Indicadores, Gráficos ou Tabela.
+        <div><b>5. Limpe a tela</b><span>No Painel, em "Mostrar no painel", desligue Indicadores ou Gráficos.
           O botão ☰ Filtros esconde a barra da esquerda.</span></div>
-        <div><b>5. Leve para o Excel</b><span>O botão Exportar gera a tabela como você a deixou,
+        <div><b>6. Leve para o Excel</b><span>O botão Exportar gera a tabela como você a deixou,
           mais uma aba com o recorte e a meta usados.</span></div>
       </div>
       <div class="note" style="border-color:var(--amber);background:#FDF6E9;color:#6B4A0B">
@@ -647,17 +694,285 @@ const ST = {
   sla:CFG.SLA_MIN, minTs:0, maxTs:0, semConf:0, maisAntiga:null, abc:{},
   dims:['predio'], mets:['tmed'], rowsF:null,
   ver:{kpis:true,graficos:true,tabela:true}, filtrosAbertos:true, cores:{}, destaque:null,
+  pagina:'painel', sujo:{painel:true,dados:true}, dimGraf:'predio',
   f:{ini:null,fim:null,sets:{},faixas:new Set(),soAtraso:false,soAberta:false,busca:''},
   aberto:new Set(), autoExp:true, sort:{k:'tmed',dir:-1}, tbusca:'', arv:null
 };
 
 /* ============================================================
+   4A. SINCRONIZAÇÃO COMPARTILHADA
+   ============================================================ */
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyBmBesMy5LoD-kqRJd2L7MEKR7sLxHPUYk',
+  authDomain: 'tempo-de-guarda.firebaseapp.com',
+  databaseURL: 'https://tempo-de-guarda-default-rtdb.firebaseio.com',
+  projectId: 'tempo-de-guarda',
+  storageBucket: 'tempo-de-guarda.firebasestorage.app',
+  messagingSenderId: '154724571261',
+  appId: '1:154724571261:web:42f647bae975762337f914'
+};
+const FIREBASE_RAIZ = 'tempoDeGuarda/compartilhado';
+const FIREBASE_PARTE_BYTES = 550 * 1024;
+
+function statusSync(tipo,texto,detalhe){
+  const box=$('#syncBox'), txt=$('#syncTxt');
+  if(!box||!txt) return;
+  box.className='syncbox '+tipo;
+  txt.textContent=texto;
+  box.title=detalhe||texto;
+}
+function listaFirebase(v){
+  if(Array.isArray(v)) return v;
+  if(!v||typeof v!=='object') return [];
+  return Object.keys(v).sort((a,b)=>(+a)-(+b)).map(k=>v[k]);
+}
+function mapaFirebase(mapa,header){
+  const out={}, colunas=new Set(header||[]);
+  for(const [k,v] of Object.entries(mapa||{})){
+    if(typeof v==='string'&&colunas.has(v)) out[k]=v;
+  }
+  return out;
+}
+function linhaFirebase(raw){
+  return listaFirebase(raw).map(v=>v==null?'':String(v));
+}
+function* partesFirebase(linhas){
+  const enc=new TextEncoder();
+  let parte=[], bytes=2;
+  for(const raw of linhas){
+    const linha=linhaFirebase(raw);
+    const tam=enc.encode(JSON.stringify(linha)).byteLength+1;
+    if(parte.length&&bytes+tam>FIREBASE_PARTE_BYTES){
+      yield parte;
+      parte=[]; bytes=2;
+    }
+    parte.push(linha); bytes+=tam;
+  }
+  if(parte.length) yield parte;
+}
+function detalheFirebase(meta){
+  const data=meta&&meta.savedAt ? new Date(meta.savedAt).toLocaleString('pt-BR') : '';
+  const linhas=meta&&meta.rowCount!=null ? nf0.format(meta.rowCount)+' linhas' : '';
+  return [meta&&meta.nome,linhas,data].filter(Boolean).join(' · ');
+}
+
+const FB = {
+  appSdk:null, dbSdk:null, db:null, pronto:false, conectado:false, iniciando:false,
+  publicando:false, versao:null, assinatura:null, cargaSeq:0, pendente:null, mapaPendente:null,
+  metaRecebida:false, carregando:false, ultimaMeta:null,
+
+  iniciar(appSdk,dbSdk){
+    if(this.pronto) return;
+    this.appSdk=appSdk; this.dbSdk=dbSdk;
+    const app=appSdk.initializeApp(FIREBASE_CONFIG);
+    this.db=dbSdk.getDatabase(app);
+    this.pronto=true; this.iniciando=false;
+    statusSync('busy','Conectando','Conectando ao banco compartilhado');
+
+    dbSdk.onValue(dbSdk.ref(this.db,'.info/connected'),snap=>{
+      this.conectado=snap.val()===true;
+      if(!this.conectado){
+        statusSync('off','Sem conexão','O painel continua aberto, mas a sincronização aguarda a internet');
+        return;
+      }
+      if(this.publicando) statusSync('busy','Sincronizando','Enviando a base para os demais navegadores');
+      else if(this.carregando) statusSync('busy','Baixando base',detalheFirebase(this.ultimaMeta));
+      else if(this.metaRecebida&&this.ultimaMeta&&this.ultimaMeta.version) statusSync('ok','Sincronizado',detalheFirebase(this.ultimaMeta));
+      else if(this.metaRecebida) statusSync('ok','Banco vazio','Ainda não existe uma base compartilhada');
+      else statusSync('busy','Buscando base','Conectado ao banco compartilhado');
+
+      if(this.pendente&&!this.publicando){
+        const p=this.pendente; this.pendente=null; this.mapaPendente=null;
+        this.publicar(p.header,p.linhas,p.nome,p.mapa);
+      } else if(this.mapaPendente&&!this.publicando){
+        const m=this.mapaPendente; this.mapaPendente=null;
+        this.atualizarMapa(m);
+      }
+    },err=>this.falha(err));
+
+    dbSdk.onValue(dbSdk.ref(this.db,FIREBASE_RAIZ+'/current'),snap=>{
+      this.receber(snap.val());
+    },err=>this.falha(err));
+  },
+
+  falha(err){
+    console.error('Falha na sincronização com o Firebase',err);
+    statusSync('error','Falha ao sincronizar',err&&err.message?err.message:'Não foi possível acessar o banco');
+  },
+
+  async receber(meta){
+    this.metaRecebida=true; this.ultimaMeta=meta;
+    if(!meta||!meta.version){
+      this.cargaSeq++; this.carregando=false; ocupado('');
+      this.versao=null; this.assinatura=null;
+      statusSync(this.conectado?'ok':'off','Banco vazio','Ainda não existe uma base compartilhada');
+      return;
+    }
+    const assinatura=meta.version+'|'+(meta.mapUpdatedAt||meta.savedAt||0);
+    if(assinatura===this.assinatura){
+      statusSync(this.conectado?'ok':'off','Sincronizado',detalheFirebase(meta));
+      return;
+    }
+
+    if(meta.version===this.versao&&ST._linhas&&ST._linhas.length){
+      try{
+        ST.mapa=mapaFirebase(meta.mapa,ST.colunas);
+        montar(ST._linhas,ST.colunas);
+        ST.aberto.clear(); ST.autoExp=true;
+        renderFiltros(); atualizar();
+        this.assinatura=assinatura;
+        statusSync(this.conectado?'ok':'off','Sincronizado',detalheFirebase(meta));
+        toast('Configuração de colunas atualizada em tempo real.');
+      }catch(e){ this.falha(e); }
+      return;
+    }
+    await this.carregar(meta,assinatura);
+  },
+
+  async carregar(meta,assinatura){
+    const token=++this.cargaSeq;
+    const header=listaFirebase(meta.header).map(v=>String(v==null?'':v));
+    const total=Math.max(0,Math.floor(Number(meta.chunkCount)||0));
+    if(!header.length||!total){
+      this.falha(new Error('A base compartilhada está incompleta'));
+      return;
+    }
+    statusSync('busy','Baixando base',detalheFirebase(meta));
+    ocupado('Baixando a base compartilhada…');
+    this.carregando=true;
+    const linhas=[];
+    try{
+      for(let inicio=0;inicio<total;inicio+=4){
+        const fim=Math.min(total,inicio+4), buscas=[];
+        for(let i=inicio;i<fim;i++){
+          const chave=String(i).padStart(6,'0');
+          buscas.push(this.dbSdk.get(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/bases/'+meta.version+'/chunks/'+chave)));
+        }
+        const snaps=await Promise.all(buscas);
+        if(token!==this.cargaSeq) return;
+        for(const snap of snaps){
+          const parte=listaFirebase(snap.val());
+          for(const raw of parte) linhas.push(linhaFirebase(raw));
+        }
+        ocupado('Baixando a base compartilhada… '+Math.min(fim,total)+' de '+total);
+      }
+      if(token!==this.cargaSeq) return;
+      ST.abasArquivo=[]; ST.abaEscolhida=null; ST._arquivo=null;
+      const ok=concluir(header,linhas,meta.nome||'Base compartilhada',performance.now(),meta.mapa,true);
+      if(!ok) throw new Error('A base compartilhada não contém linhas válidas');
+      this.versao=meta.version; this.assinatura=assinatura;
+      statusSync(this.conectado?'ok':'off','Sincronizado',detalheFirebase(meta));
+    }catch(e){
+      if(token===this.cargaSeq) this.falha(e);
+    }finally{
+      if(token===this.cargaSeq){ this.carregando=false; ocupado(''); }
+    }
+  },
+
+  async publicar(header,linhas,nome,mapa){
+    const dados={header,linhas,nome,mapa};
+    if(!this.pronto||!this.conectado||this.publicando){
+      this.pendente=dados;
+      statusSync('busy','Aguardando conexão','A base será enviada assim que a conexão estiver disponível');
+      toast('Base carregada neste navegador. A sincronização aguarda a conexão.');
+      return false;
+    }
+
+    this.publicando=true;
+    const versaoAnterior=this.versao, assinaturaAnterior=this.assinatura;
+    let versao='', publicado=false;
+    try{
+      const atualRef=this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/current');
+      const atualSnap=await this.dbSdk.get(atualRef);
+      const metaAnterior=atualSnap.val()||{};
+      versao='v'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+      const headerLimpo=listaFirebase(header).map(v=>String(v==null?'':v));
+      const mapaLimpo=mapaFirebase(mapa,headerLimpo);
+      let indice=0, concluidas=0, grupo=[];
+
+      const esperarGrupo=async()=>{
+        const resultados=await Promise.allSettled(grupo.splice(0));
+        const falhou=resultados.find(r=>r.status==='rejected');
+        if(falhou) throw falhou.reason;
+      };
+
+      ocupado('Preparando a sincronização…');
+      for(const parte of partesFirebase(linhas)){
+        const i=indice++, chave=String(i).padStart(6,'0');
+        const tarefa=this.dbSdk.set(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/bases/'+versao+'/chunks/'+chave),parte)
+          .then(()=>{
+            concluidas++;
+            statusSync('busy','Enviando parte '+concluidas,'Sincronizando a base compartilhada');
+            ocupado('Enviando a base compartilhada… parte '+concluidas);
+          });
+        grupo.push(tarefa);
+        if(grupo.length>=4) await esperarGrupo();
+      }
+      if(grupo.length) await esperarGrupo();
+      if(!indice) throw new Error('Não existem linhas para sincronizar');
+
+      const agora=Date.now();
+      const meta={
+        schema:2, version:versao, nome:String(nome||'Base compartilhada'),
+        header:headerLimpo, mapa:mapaLimpo, chunkCount:indice,
+        rowCount:linhas.length, savedAt:agora, mapUpdatedAt:agora
+      };
+      if(metaAnterior.version) meta.previousVersion=metaAnterior.version;
+      const assinatura=versao+'|'+agora;
+      this.versao=versao; this.assinatura=assinatura;
+      await this.dbSdk.set(atualRef,meta);
+      publicado=true;
+      this.metaRecebida=true; this.ultimaMeta=meta;
+
+      const expirar=metaAnterior.previousVersion;
+      if(expirar&&expirar!==metaAnterior.version&&expirar!==versao){
+        try{ await this.dbSdk.remove(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/bases/'+expirar)); }catch(_){}
+      }
+      statusSync('ok','Sincronizado',detalheFirebase(meta));
+      toast(nf0.format(linhas.length)+' linhas sincronizadas em todos os navegadores.');
+      return true;
+    }catch(e){
+      this.versao=versaoAnterior; this.assinatura=assinaturaAnterior;
+      if(versao&&!publicado){
+        try{ await this.dbSdk.remove(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/bases/'+versao)); }catch(_){}
+      }
+      this.falha(e);
+      toast('A base ficou disponível apenas neste navegador. Tente novamente quando houver conexão.');
+      return false;
+    }finally{
+      this.publicando=false; ocupado('');
+    }
+  },
+
+  async atualizarMapa(mapa){
+    const limpo=mapaFirebase(mapa,ST.colunas);
+    if(this.pendente) this.pendente.mapa=limpo;
+    if(!this.versao) return;
+    if(!this.pronto||!this.conectado||this.publicando){
+      this.mapaPendente=limpo;
+      statusSync('busy','Aguardando conexão','A configuração das colunas será sincronizada quando a internet voltar');
+      return;
+    }
+    const anterior=this.assinatura, agora=Date.now();
+    this.assinatura=this.versao+'|'+agora;
+    try{
+      await this.dbSdk.update(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/current'),{
+        mapa:limpo, mapUpdatedAt:agora
+      });
+      statusSync('ok','Sincronizado','Configuração das colunas atualizada');
+    }catch(e){
+      this.assinatura=anterior; this.mapaPendente=limpo; this.falha(e);
+    }
+  }
+};
+
+/* ============================================================
    5. CARGA
    ============================================================ */
-function aplicarBase(header, linhas, nome, t0){
+function aplicarBase(header, linhas, nome, t0, mapaPreferido){
   if(!header||!header.length||!linhas||!linhas.length){ toast('Arquivo vazio ou ilegível.'); return false; }
   ST.colunas=header; ST.arquivo=nome;
-  ST.mapa=autoMap(header);
+  ST.mapa=mapaPreferido ? mapaFirebase(mapaPreferido,header) : autoMap(header);
   if(!ST.mapa.dataConf||!ST.mapa.dataCria){ toast('Não identifiquei as datas de criação/confirmação — ajuste em "Colunas".'); }
   montar(linhas, header);
   ST.origem = nome+' · '+nf0.format(ST.rows.length)+' linhas · '+Math.round(performance.now()-t0)+' ms';
@@ -1414,6 +1729,14 @@ async function graficoParaJPEG(sel, card){
 /* ---------- painel inteiro ---------- */
 async function painelParaJPEG(){
   if(!ST.arv){ toast('Carregue um arquivo primeiro.'); return; }
+  const voltarPara = ST.pagina;
+  if(ST.pagina!=='painel'||ST.sujo.painel){          // garante gráficos desenhados e medidos
+    ST.pagina='painel'; aplicarVisibilidade();
+    const verKpis=ST.ver.kpis, verGraf=ST.ver.graficos;
+    ST.ver.kpis=true; ST.ver.graficos=true; aplicarVisibilidade();
+    desenharPainel(); ST.ver.kpis=verKpis; ST.ver.graficos=verGraf;
+    await new Promise(r=>setTimeout(r,60));
+  }
   ocupado('Montando a imagem do painel…');
   try{
     const cards=[...document.querySelectorAll('.ch')].filter(c=>c.querySelector('svg'));
@@ -1473,6 +1796,7 @@ async function painelParaJPEG(){
     g.fillText('Gerado em '+new Date().toLocaleString('pt-BR')+' · tempo de guarda = confirmação menos criação da OT · OTs em aberto ficam fora das médias',pad,H-12);
     baixarCanvas(cv,'painel_tempo_de_guarda_'+iso(Date.now())+'.jpg');
   }catch(err){ toast('Não consegui gerar a imagem: '+err.message); }
+  if(voltarPara!==ST.pagina) mostrarPagina(voltarPara); else aplicarVisibilidade();
   ocupado('');
 }
 
@@ -1607,26 +1931,38 @@ function renderChips(){
     mc.appendChild(c);
   }
   const vc=$('#verChips'); vc.innerHTML='';
-  [['kpis','Indicadores'],['tabela','Tabela'],['graficos','Gráficos']].forEach(([k,l])=>{
+  [['kpis','Indicadores'],['graficos','Gráficos']].forEach(([k,l])=>{
     const on=ST.ver[k];
     const c=el('button','chip v'+(on?' on':''),(on?'✓ ':'')+l);
     c.title=on?'Clique para esconder '+l.toLowerCase()+'.':'Clique para mostrar '+l.toLowerCase()+'.';
     c.onclick=()=>{
       ST.ver[k]=!ST.ver[k]; aplicarVisibilidade(); renderChips();
       if(!ST.ver[k]) return;
-      rodarPesado(()=>{
-        if(k==='kpis') renderKPIs();
-        else if(k==='graficos') renderGraficos(filtradas());
-        else renderTabela();
-      });
+      rodarPesado(()=>{ if(k==='kpis') renderKPIs(); else renderGraficos(filtradas()); });
     };
     vc.appendChild(c);
   });
 }
 function aplicarVisibilidade(){
+  const P = ST.pagina==='painel';
+  $('#pgPainel').style.display   = P?'flex':'none';
+  $('#pgGraficos').style.display = P?'flex':'none';
+  $('#pgDados').style.display    = P?'none':'flex';
   $('#kpis').style.display   = ST.ver.kpis?'':'none';
   $('#charts').style.display = ST.ver.graficos?'':'none';
-  $('#cardTabela').style.display = ST.ver.tabela?'':'none';
+  document.querySelectorAll('.aba').forEach(a=>a.classList.toggle('on',a.dataset.p===ST.pagina));
+}
+function mostrarPagina(p){
+  ST.pagina=p; aplicarVisibilidade();
+  if(!ST.rows.length) return;
+  if(p==='painel'&&ST.sujo.painel) rodarPesado(()=>{ desenharPainel(); });
+  if(p==='dados' &&ST.sujo.dados)  rodarPesado(()=>{ renderTabela(); renderRodape(filtradas()); ST.sujo.dados=false; });
+}
+function desenharPainel(){
+  const rows=filtradas();
+  if(ST.ver.kpis) renderKPIs();
+  if(ST.ver.graficos) renderGraficos(rows);
+  ST.sujo.painel=false;
 }
 
 /* ============================================================
@@ -1831,17 +2167,26 @@ function gHeat(id,grade,cont){
   n.innerHTML=s+'</svg>';
 }
 
-function renderGraficos(rows){
-  const dimP=dimPorId(ST.dims[0])||dimPorId('predio');
-  $('#s1').textContent='tempo médio por '+dimP.lbl.toLowerCase();
+function renderGrafico1(rows){
+  const d=dimPorId(ST.dimGraf)||dimPorId('predio');
   const mp=new Map();
-  for(const r of rows){ if(r.min==null) continue; const k=String(dimP.g(r));
+  for(const r of rows){ if(r.min==null) continue; const k=String(d.g(r));
     let o=mp.get(k); if(!o){ o={s:0,n:0,fora:0}; mp.set(k,o); }
     o.s+=r.min; o.n++; if(r.min>ST.sla) o.fora++; }
   gBarras('#c1',[...mp.entries()].map(([k,o])=>({k,v:o.s/o.n,n:o.n,pct:100*o.fora/o.n}))
     .sort((a,b)=>b.v-a.v).slice(0,CFG.TOP_N));
-
+}
+function preencherSelDim(){
+  const s=$('#selDimGraf'); if(!s) return;
+  if(!dimPorId(ST.dimGraf)) ST.dimGraf=(dimensoes()[0]||{id:'predio'}).id;
+  s.innerHTML=dimensoes().map(d=>'<option value="'+esc(d.id)+'"'+(d.id===ST.dimGraf?' selected':'')+'>'+esc(d.lbl)+'</option>').join('');
+  s.onchange=()=>{ ST.dimGraf=s.value; rodarPesado(()=>{ renderGrafico1(filtradas()); montarMenusGraficos(); }); };
+}
+function renderGraficos(rows){
+  preencherSelDim();
+  renderGrafico1(rows);
   const mm=new Map();
+
   for(const r of rows){ let o=mm.get(r.mes); if(!o){ o={n:0,s:0,c:0}; mm.set(r.mes,o); }
     o.n++; if(r.min!=null){ o.s+=r.min; o.c++; } }
   const cats=[...mm.keys()].sort();
@@ -2074,7 +2419,10 @@ function abrirModal(){
 function aplicarModal(){
   const novo={}; $('#mapFields').querySelectorAll('select').forEach(s=>{ if(s.value) novo[s.dataset.campo]=s.value; });
   ST.mapa=novo;
-  if(ST._linhas){ ocupado('Recalculando…'); setTimeout(()=>{ montar(ST._linhas,ST.colunas); ST.aberto.clear(); renderFiltros(); atualizar(); ocupado(''); toast('Colunas atualizadas.'); },30); }
+  if(ST._linhas){ ocupado('Recalculando…'); setTimeout(()=>{
+    montar(ST._linhas,ST.colunas); ST.aberto.clear(); renderFiltros(); atualizar(); ocupado('');
+    toast('Colunas atualizadas.'); FB.atualizarMapa(ST.mapa);
+  },30); }
   $('#modal').classList.remove('on');
 }
 
@@ -2090,7 +2438,7 @@ function reconstruir(){
 let _tarefa=null;
 /* pinta a interface primeiro, calcula depois — o clique responde na hora */
 function verTabela(){
-  if(!ST.ver.tabela) return;
+  if(ST.pagina!=='dados') return;
   const r=$('#cardTabela').getBoundingClientRect();
   if(r.top>window.innerHeight-120) $('#cardTabela').scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -2108,21 +2456,20 @@ function precisaArvore(){
 /* trocar coluna: não mexe na árvore nem nos gráficos, só redesenha a tabela */
 function aplicarColunas(){
   if(!ST.mets.includes(ST.sort.k)) ST.sort.k=ST.mets[0]||'__k';
-  renderChips(); renderResumo();
-  if(precisaArvore()) rodarPesado(()=>{ reconstruir(); if(ST.ver.tabela) renderTabela(); renderRodape(filtradas()); });
-  else { if(ST.ver.tabela) renderTabela(); renderRodape(filtradas()); }
+  renderChips(); renderResumo(); ST.sujo.dados=true;
+  if(ST.pagina!=='dados') return;
+  if(precisaArvore()) rodarPesado(()=>{ reconstruir(); renderTabela(); renderRodape(filtradas()); ST.sujo.dados=false; });
+  else { renderTabela(); renderRodape(filtradas()); ST.sujo.dados=false; }
   verTabela();
 }
 /* trocar agrupamento: refaz a árvore a partir das linhas já filtradas */
 function aplicarGrupos(){
   ST.aberto.clear(); ST.autoExp=true;
-  renderChips(); renderResumo();
+  renderChips(); renderResumo(); ST.sujo.dados=true;
+  if(ST.pagina!=='dados') return;
   rodarPesado(()=>{
-    reconstruir();
-    if(ST.ver.graficos) renderGraficos(filtradas());
-    if(ST.ver.tabela) renderTabela();
-    renderRodape(filtradas());
-    verTabela();
+    reconstruir(); renderTabela(); renderRodape(filtradas());
+    ST.sujo.dados=false; verTabela();
   });
 }
 function atualizar(){
@@ -2131,27 +2478,28 @@ function atualizar(){
   ST.rowsF=null;
   const rows=filtradas();
   reconstruir();
-  renderChips(); renderResumo(); aplicarVisibilidade();
-  if(ST.ver.kpis) renderKPIs();
-  if(ST.ver.graficos) renderGraficos(rows);
-  if(ST.ver.tabela) renderTabela();
-  renderRodape(rows);
+  renderChips(); renderResumo(); aplicarVisibilidade(); renderRodape(rows);
+  ST.sujo={painel:true,dados:true};
+  if(ST.pagina==='painel') desenharPainel();
+  else { renderTabela(); ST.sujo.dados=false; }
   $('#tempoCalc').textContent=Math.round(performance.now()-t0)+' ms';
 }
-function concluir(header,linhas,nome,t0){
+function concluir(header,linhas,nome,t0,mapaPreferido,remota){
   ST._linhas=linhas; ST.colunas=header;
-  if(!aplicarBase(header,linhas,nome,t0)) return;
+  if(!aplicarBase(header,linhas,nome,t0,mapaPreferido)) return false;
   if(!ST.rows.length){
     $('#painel').style.display='none'; $('#vazio').style.display='';
     toast('Nenhuma linha com data de criação e confirmação reconhecíveis nessa aba. Escolha outra aba ou ajuste as colunas.');
-    return;
+    return false;
   }
   $('#vazio').style.display='none'; $('#painel').style.display='';
   ST.dims=[idReal('predio')].filter(id=>dimPorId(id));
   if(!ST.dims.length) ST.dims=['predio'];
+  ST.dimGraf=ST.dims[0]; ST.pagina='painel';
   ST.aberto.clear(); ST.autoExp=true;
   renderFiltros(); atualizar();
-  toast(nf0.format(ST.rows.length)+' linhas carregadas.');
+  toast((remota?'Base compartilhada atualizada: ':'')+nf0.format(ST.rows.length)+' linhas carregadas.');
+  return true;
 }
 async function lerArquivo(f,aba){
   if(!f) return;
@@ -2165,7 +2513,8 @@ async function lerArquivo(f,aba){
       const t0=performance.now();
       const r=await XL.importar(f,msg=>ocupado(msg),aba||ST.abaEscolhida);
       ST.abasArquivo=r.abas; ST.abaEscolhida=r.aba;
-      concluir(r.header,r.linhas,f.name+' · aba "'+r.aba+'"',t0);
+      const nome=f.name+' · aba "'+r.aba+'"';
+      if(concluir(r.header,r.linhas,nome,t0)) await FB.publicar(r.header,r.linhas,nome,ST.mapa);
     } else {
       ocupado('Lendo '+f.name+'…');
       const txt=await f.text();
@@ -2173,7 +2522,7 @@ async function lerArquivo(f,aba){
       const t0=performance.now();
       const parsed=parseCSV(txt);
       ST.abasArquivo=[]; ST.abaEscolhida=null;
-      concluir(parsed.header,parsed.linhas,f.name,t0);
+      if(concluir(parsed.header,parsed.linhas,f.name,t0)) await FB.publicar(parsed.header,parsed.linhas,f.name,ST.mapa);
     }
   }catch(e){ toast('Erro ao ler o arquivo: '+e.message); }
   ocupado('');
@@ -2210,6 +2559,7 @@ $('#burger').onclick=()=>{
   $('#side').style.display=ST.filtrosAbertos?'':'none';
   if(ST.rows.length&&ST.ver.graficos) setTimeout(()=>renderGraficos(filtradas()),40);
 };
+document.querySelectorAll('.aba').forEach(a=>a.onclick=()=>mostrarPagina(a.dataset.p));
 $('#btnGuia').onclick=()=>$('#guia').classList.add('on');
 $('#guiaClose').onclick=()=>$('#guia').classList.remove('on');
 $('#guia').onclick=e=>{ if(e.target.id==='guia') $('#guia').classList.remove('on'); };
@@ -2226,6 +2576,31 @@ document.addEventListener('mousemove',e=>{
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ $('#modal').classList.remove('on'); $('#guia').classList.remove('on'); } });
 renderFiltros();
 $('#logoTopo').src=LOGO_B64;
+
+async function iniciarFirebase(){
+  if(FB.pronto||FB.iniciando) return;
+  if(!navigator.onLine){
+    statusSync('off','Sem conexão','A sincronização começará quando a internet voltar');
+    return;
+  }
+  FB.iniciando=true;
+  try{
+    const [appSdk,dbSdk]=await Promise.all([
+      import('https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js'),
+      import('https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js')
+    ]);
+    FB.iniciar(appSdk,dbSdk);
+  }catch(e){
+    FB.iniciando=false;
+    FB.falha(e);
+  }
+}
+window.addEventListener('online',iniciarFirebase);
+window.addEventListener('offline',()=>{
+  FB.conectado=false;
+  statusSync('off','Sem conexão','O painel continua aberto e voltará a sincronizar quando a internet retornar');
+});
+iniciarFirebase();
 
 </script>
 </body>
