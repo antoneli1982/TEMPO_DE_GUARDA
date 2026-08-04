@@ -478,7 +478,7 @@ tr.total>td.k{background:var(--navy);color:#fff}
       <div class="card ch c6"><div class="card-h"><h3>Volume e tempo por mês</h3><span class="sub">barras = OTs · linha = tempo médio</span></div><div class="plot" id="c2"></div></div>
       <div class="card ch c6"><div class="card-h"><h3>Distribuição por faixa de tempo</h3><span class="sub">% das OTs confirmadas</span></div><div class="plot" id="c3"></div></div>
       <div class="card ch c6"><div class="card-h"><h3>Mix por destino</h3><span class="sub" id="s4"></span></div><div class="plot" id="c4"></div></div>
-      <div class="card ch c6" id="cardPapel"><div class="card-h"><h3>Tipo de papel</h3><span class="sub" id="s8">SC_PORTATIL_* = térmico · demais = A5</span></div><div class="plot" id="c8"></div></div>
+      <div class="card ch c6" id="cardPapel"><div class="card-h"><h3>Tipo de papel</h3><span class="sub" id="s8">com PORT no nome = térmico · demais = A5</span></div><div class="plot" id="c8"></div></div>
       <div class="card ch c6" id="cardImpr"><div class="card-h"><h3>Tempo médio por impressora</h3><span class="sub" id="s9"></span></div><div class="plot" id="c9"></div></div>
       <div class="card ch c12"><div class="card-h"><h3>Volume × tempo por material</h3><span class="sub">cada ponto = 1 material</span></div><div class="plot" id="c5"></div></div>
       <div class="card ch c12"><div class="card-h"><h3>Dia operacional × hora</h3><span class="sub">tempo médio de guarda</span></div><div class="plot" id="c6"></div></div>
@@ -713,13 +713,13 @@ function dataHoraBR(ts){
     day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'
   });
 }
-/* Impressoras SC_PORTATIL_* usam papel térmico; as demais, papel A5. */
+/* Impressora com PORT ou PORTATIL no nome usa papel térmico; as demais, papel A5. */
 const PAPEL_TERMICO='Papel térmico', PAPEL_A5='Papel A5', PAPEL_SEM='Sem impressora';
 const chaveImpressora = v => semAcento(v).toUpperCase().replace(/[^A-Z0-9]/g,'');
 function tipoPapel(impressora){
   const k=chaveImpressora(impressora==null?'':impressora);
   if(!k||k==='\u2014') return PAPEL_SEM;
-  return k.includes('SCPORTATIL') ? PAPEL_TERMICO : PAPEL_A5;   // pega SC_PORTATIL_01, SC-PORTÁTIL A, etc.
+  return k.includes('PORT') ? PAPEL_TERMICO : PAPEL_A5;   // PORT, PORTATIL, SC_PORTATIL_01, SC-PORTÁTIL A…
 }
 function normalizarTurno(v){
   const s=semAcento(v==null?'':v).replace(/\s+/g,' ').trim();
@@ -764,6 +764,13 @@ function dataInicioTurno(ts,turno){
   if(turno==='3'&&minuto<=TURNOS['3'].fim) d.setDate(d.getDate()-1);
   d.setHours(0,0,0,0);
   return d.getTime();
+}
+/* mês fechado no ritmo do dia operacional: dia 1 às 06:00 até o dia 1 seguinte às 06:00 */
+function periodoMes(ts){
+  const d=new Date(ts);
+  const ini=new Date(d.getFullYear(),d.getMonth(),1,0,0,0); ini.setMinutes(TURNOS['1'].inicio);
+  const fim=new Date(d.getFullYear(),d.getMonth()+1,1,0,0,0); fim.setMinutes(TURNOS['1'].inicio);
+  return {ini:ini.getTime(), fim:fim.getTime()};
 }
 /* HU = unidade de manuseio (pallet, caixa-mestre). Nomes variam bastante entre extratos. */
 function acharColunaHU(cols){
@@ -2051,7 +2058,7 @@ function renderFiltros(){
       '<div class="periodo-ajuda">Digite a hora no formato HH:MM ou HH:MM:SS.</div>'+
       '<div class="periodo-ajuda"><b>Só a data, sem hora:</b> vale o dia operacional inteiro — começa às 06:00 da data informada e termina às 06:00 do dia seguinte, fechando os três turnos.</div>'+
       '<div class="periodo-ajuda"><b>Turnos:</b> 1º das 06:00 às 15:00, 2º das 15:00 às 23:45 e 3º das 21:50 às 06:00 do dia seguinte.</div>'+
-      '<div class="quick"><button data-d="op">Último dia op.</button><button data-d="7">7 d</button><button data-d="30">30 d</button><button data-d="90">90 d</button>'+
+      '<div class="quick"><button data-d="op">Último dia op.</button><button data-d="mes"'+(mesPadraoAtivo()?' class="on"':'')+'>Mês</button><button data-d="7">7 d</button><button data-d="30">30 d</button><button data-d="90">90 d</button>'+
       '<button data-d="180">6 m</button><button data-d="0"'+(ST.f.ini==null&&ST.f.fim==null?' class="on"':'')+'>Tudo</button></div>', true);
   const feitos=new Set();
   for(const at of ORDEM_FILTROS){
@@ -2161,6 +2168,13 @@ function renderFiltros(){
   });
   s.querySelectorAll('.quick button').forEach(b=>b.onclick=()=>{
     s.querySelectorAll('.quick button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+    if(b.dataset.d==='mes'){
+      const m=periodoMes(inicioDiaOp(ST.maxTs));
+      ST.f.ini=m.ini; ST.f.fim=m.fim; ST.f.fimExclusivo=true;
+      preencherPeriodo(); atualizar();
+      toast('Mês de '+new Date(m.ini).toLocaleDateString('pt-BR',{month:'long',year:'numeric'})+'.');
+      return;
+    }
     if(b.dataset.d==='op'){
       const ini=inicioDiaOp(ST.maxTs);
       ST.f.ini=ini; ST.f.fim=maisUmDia(ini); ST.f.fimExclusivo=true;
@@ -2694,7 +2708,7 @@ function renderPapelEImpressora(rows){
     const o=pp.get(p);
     if(p===PAPEL_SEM) return p+': '+nf0.format(o.n)+' OTs';
     return p+': '+nf0.format(o.impr.size)+(o.impr.size===1?' impressora':' impressoras');
-  }).join(' · ')||'SC_PORTATIL_* = térmico · demais = A5';
+  }).join(' · ')||'com PORT no nome = térmico · demais = A5';
 
   const lista=[...ip.entries()].filter(([,o])=>o.c>0)
     .map(([k,o])=>({k: o.pap===PAPEL_SEM ? 'Sem impressora'
@@ -2845,7 +2859,7 @@ function abaParametros(){
     ['Coluna de impressora',ST.colImpressora||'não encontrada no arquivo'],
     ['Coluna de HU',ST.colHU||'não encontrada no arquivo'],
     ['HUs distintas na base',ST.colHU?nf0.format(new Set(ST.rows.map(r=>r.hu).filter(Boolean)).size):'—'],
-    ['Regra do tipo de papel','Impressora com SC_PORTATIL no nome = papel térmico; qualquer outra = papel A5; em branco = sem impressora'],
+    ['Regra do tipo de papel','Impressora com PORT ou PORTATIL no nome = papel térmico; qualquer outra = papel A5; em branco = sem impressora'],
     ['Unidade dos tempos','minutos'],
     ['SLA aplicado',ST.sla+' minutos'],
     ['Guarda imediata','até '+CFG.IMEDIATO_MIN+' minutos'],
@@ -2990,6 +3004,18 @@ function atualizar(){
   else { renderTabela(); ST.sujo.dados=false; }
   $('#tempoCalc').textContent=Math.round(performance.now()-t0)+' ms';
 }
+/* abre já no último mês com movimento; a base inteira continua a um clique em "Tudo" */
+function aplicarMesPadrao(){
+  if(!isFinite(ST.maxTs)||!ST.rows.length) return;
+  const m=periodoMes(inicioDiaOp(ST.maxTs));
+  if(ST.minTs>=m.ini) return;                    // base cabe num mês só: não faz sentido recortar
+  ST.f.ini=m.ini; ST.f.fim=m.fim; ST.f.fimExclusivo=true;
+}
+function mesPadraoAtivo(){
+  if(ST.f.ini==null||ST.f.fim==null||!isFinite(ST.maxTs)) return false;
+  const m=periodoMes(inicioDiaOp(ST.maxTs));
+  return ST.f.ini===m.ini&&ST.f.fim===m.fim;
+}
 function concluir(header,linhas,nome,t0,mapaPreferido,remota){
   ST._linhas=linhas; ST.colunas=header;
   if(!aplicarBase(header,linhas,nome,t0,mapaPreferido)) return false;
@@ -3000,6 +3026,7 @@ function concluir(header,linhas,nome,t0,mapaPreferido,remota){
   }
   $('#vazio').style.display='none'; $('#painel').style.display='';
   ST.f={ini:null,fim:null,fimExclusivo:false,sets:{},faixas:new Set(),soAtraso:false,soAberta:false,busca:''};
+  aplicarMesPadrao();
   ST.tbusca='';
   if($('#tSearch')) $('#tSearch').value='';
   ST.dims=[idReal('predio')].filter(id=>dimPorId(id));
@@ -3007,7 +3034,8 @@ function concluir(header,linhas,nome,t0,mapaPreferido,remota){
   ST.dimGraf=ST.dims[0]; ST.pagina='painel';
   ST.aberto.clear(); ST.autoExp=true;
   renderFiltros(); atualizar();
-  toast((remota?'Base compartilhada atualizada: ':'')+nf0.format(ST.rows.length)+' linhas carregadas.');
+  toast((remota?'Base compartilhada atualizada: ':'')+nf0.format(ST.rows.length)+' linhas carregadas.'+
+        (mesPadraoAtivo()?' Mostrando '+new Date(ST.f.ini).toLocaleDateString('pt-BR',{month:'long',year:'numeric'})+'; use "Tudo" para ver a base inteira.':''));
   return true;
 }
 async function lerArquivo(f,aba){
