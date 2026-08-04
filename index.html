@@ -157,6 +157,10 @@ button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(152px,1fr));gap:10px}
 .kpi{background:#fff;border:1px solid var(--line);border-radius:var(--r-lg);padding:11px 13px 12px;position:relative;overflow:hidden}
 .kpi:before{content:"";position:absolute;left:0;top:0;height:3px;width:100%;background:var(--brand);opacity:.9}
+.kpi[data-tip]{cursor:help}
+.kpi-i{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;margin-left:5px;
+  border:1px solid var(--line);border-radius:50%;font-size:9px;font-weight:700;color:var(--muted);vertical-align:1px}
+.kpi:hover .kpi-i{border-color:var(--brand);color:var(--brand)}
 .kpi.warn:before{background:var(--amber)}
 .kpi.bad:before{background:var(--red)}
 .kpi .v{font-size:23px;font-weight:680;letter-spacing:-.025em;line-height:1.15;font-variant-numeric:tabular-nums;color:var(--navy);margin-top:7px}
@@ -342,7 +346,7 @@ tr.total>td.k{background:var(--navy);color:#fff}
 /* ---------------- TOOLTIP / TOAST ---------------- */
 .tip{
   position:fixed;pointer-events:none;background:var(--navy);color:#fff;padding:6px 9px;border-radius:var(--r-sm);
-  font-size:11.5px;line-height:1.4;box-shadow:var(--sh-2);opacity:0;transition:opacity .1s;z-index:200;max-width:260px
+  font-size:12px;line-height:1.5;box-shadow:var(--sh-2);opacity:0;transition:opacity .1s;z-index:200;max-width:330px
 }
 .tip.on{opacity:1}
 .tip b{color:#9DB4FB}
@@ -2304,18 +2308,41 @@ function renderKPIs(rows){
   const med=a.c>0?a.s/a.c:null, p50=quantil(a.hist,.5), p90=quantil(a.hist,.9);
   const pctS=a.c>0?100*a.fora/a.c:null, pct15=a.c>0?100*a.rap/a.c:null;
   const cls=v=>v==null?'':(v>ST.sla?'bad':v>ST.sla*.75?'warn':'');
+  const colQtd = (ST.mapa&&ST.mapa.qtd) ? '<b>'+esc(ST.mapa.qtd)+'</b>' : 'quantidade (não mapeada: cada OT vale 1)';
   const cards=[
-    ['Tempo médio de guarda', dur(med), '', 'da criação da OT até a confirmação', cls(med)],
-    ['Acima da meta de '+dur(ST.sla), pctS==null?'—':nf1.format(pctS), '%', pctS==null?'—':nf0.format(a.fora)+' OTs passaram da meta', pctS==null?'':(pctS>25?'bad':pctS>15?'warn':'')],
-    ['OTs no recorte', nf0.format(ots==null?a.n:ots), '', nf0.format(a.c)+' confirmadas · '+nf0.format(a.ab)+' em aberto'],
-    ['Metade foi guardada em', dur(p50), '', 'e 9 em cada 10, em até '+dur(p90)],
-    ...(ST.colHU? [['HUs no recorte', nf0.format(hus), '', nf0.format(husG)+' já guardadas'+(hus?' · '+nf1.format(a.n/hus)+' OTs por HU':'')]] : []),
-    ['OTs em aberto', nf0.format(a.ab), '', ST.maisAntiga?'a mais antiga é de '+new Date(ST.maisAntiga).toLocaleDateString('pt-BR'):'nenhuma pendência', a.ab>0?'warn':''],
-    ['Quantidade guardada', nf0.format(a.qc), '', a.dc?nf1.format(100*a.d0/a.dc)+'% no mesmo dia da entrada':'apenas OTs confirmadas'],
-    ['Quantidade total', nf0.format(a.q), '', 'no recorte · '+nf0.format(ST.qtdBase)+' na base inteira'+(ST.mapa&&ST.mapa.qtd?'':' (coluna não mapeada: 1 por OT)')]
+    ['Tempo médio de guarda', dur(med), '', 'da criação da OT até a confirmação', cls(med),
+     'Para cada OT confirmada, o painel mede quanto tempo passou entre criar e confirmar. Depois soma esses tempos e divide pelo número de OTs confirmadas.<br><br>'+
+     'Entram '+nf0.format(a.c)+' OTs. As em aberto ficam de fora, porque ainda não têm fim.'],
+    ['Acima da meta de '+dur(ST.sla), pctS==null?'—':nf1.format(pctS), '%', pctS==null?'—':nf0.format(a.fora)+' OTs passaram da meta', pctS==null?'':(pctS>25?'bad':pctS>15?'warn':''),
+     'Quantas OTs demoraram mais que a meta, em cada 100 confirmadas.<br><br>'+
+     'Conta: '+nf0.format(a.fora)+' acima da meta ÷ '+nf0.format(a.c)+' confirmadas × 100.<br>'+
+     'A meta de '+dur(ST.sla)+' é a que você define na barra lateral.'],
+    ['OTs no recorte', nf0.format(ots==null?a.n:ots), '', nf0.format(a.c)+' confirmadas · '+nf0.format(a.ab)+' em aberto',
+     '', 'Contagem de linhas'+(ST.colOT?' com ordem de transporte preenchida na coluna <b>'+esc(ST.colOT)+'</b>':'')+
+     ', dentro do período e dos filtros ativos.<br><br>Cada linha vale 1, sem somar peças.'],
+    ['Metade foi guardada em', dur(p50), '', 'e 9 em cada 10, em até '+dur(p90), '',
+     'Ordene todas as OTs confirmadas do tempo menor para o maior. O valor do meio da fila é este número.<br><br>'+
+     'É diferente da média: um caso muito demorado puxa a média para cima, mas quase não mexe no meio da fila.'],
+    ...(ST.colHU? [['HUs no recorte', nf0.format(hus), '', nf0.format(husG)+' já guardadas'+(hus?' · '+nf1.format(a.n/hus)+' OTs por HU':''), '',
+     'Quantas HUs diferentes aparecem na coluna <b>'+esc(ST.colHU)+'</b> dentro do recorte.<br><br>'+
+     'A mesma HU repetida em várias linhas conta uma vez só.']] : []),
+    ['OTs em aberto', nf0.format(a.ab), '', ST.maisAntiga?'a mais antiga é de '+new Date(ST.maisAntiga).toLocaleDateString('pt-BR'):'nenhuma pendência', a.ab>0?'warn':'',
+     'OTs que foram criadas mas ainda não têm data e hora de confirmação.<br><br>'+
+     'Elas não entram em nenhum cálculo de tempo, porque ainda não terminaram.'],
+    ['Quantidade guardada', nf0.format(a.qc), '', a.dc?nf1.format(100*a.d0/a.dc)+'% no mesmo dia da entrada':'apenas OTs confirmadas', '',
+     'Soma da coluna '+colQtd+', somando só as linhas de OTs já confirmadas, dentro do período e dos filtros.<br><br>'+
+     'São peças, não OTs. O número de OTs está no card "OTs no recorte".<br><br>'+
+     (a.dc? 'O texto abaixo é outra conta: entre as OTs que têm data de entrada da mercadoria, '+
+            nf1.format(100*a.d0/a.dc)+'% foram guardadas no mesmo dia em que a mercadoria entrou ('+
+            nf0.format(a.d0)+' de '+nf0.format(a.dc)+').' : '')],
+    ['Quantidade total', nf0.format(a.q), '', 'no recorte · '+nf0.format(ST.qtdBase)+' na base inteira'+(ST.mapa&&ST.mapa.qtd?'':' (coluna não mapeada: 1 por OT)'), '',
+     'Mesma soma da coluna '+colQtd+', mas sem separar por situação: entram as OTs confirmadas e também as em aberto.<br><br>'+
+     'A diferença para a quantidade guardada é o que ainda está pendente.<br><br>'+
+     'Na base inteira, ignorando período e filtros, a soma é '+nf0.format(ST.qtdBase)+'.']
   ];
   $('#kpis').innerHTML=cards.map(c=>
-    '<div class="kpi '+(c[4]||'')+'"><div class="eyebrow">'+esc(c[0])+'</div><div class="v">'+c[1]+
+    '<div class="kpi '+(c[4]||'')+'"'+(c[5]?' data-tip="'+('<b>'+esc(c[0])+'</b><br><br>'+c[5]).replace(/"/g,'&quot;')+'"':'')+
+    '><div class="eyebrow">'+esc(c[0])+(c[5]?'<span class="kpi-i">?</span>':'')+'</div><div class="v">'+c[1]+
     (c[2]?'<small>'+c[2]+'</small>':'')+'</div><div class="h">'+esc(c[3]||'')+'</div></div>').join('');
 }
 
@@ -3136,7 +3163,10 @@ document.addEventListener('mouseout',e=>{ if(e.target.closest&&e.target.closest(
 document.addEventListener('mousemove',e=>{
   if(!TIP.classList.contains('on')) return;
   TIP.style.left=Math.min(window.innerWidth-TIP.offsetWidth-10,Math.max(8,e.clientX+14))+'px';
-  TIP.style.top=Math.max(8,e.clientY-TIP.offsetHeight-12)+'px';
+  const th=TIP.offsetHeight;
+  let top=e.clientY-th-12;
+  if(top<8) top=Math.min(window.innerHeight-th-8, e.clientY+18);   // não coube acima: vai para baixo
+  TIP.style.top=Math.max(8,top)+'px';
 });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ $('#modal').classList.remove('on'); $('#guia').classList.remove('on'); } });
 renderFiltros();
