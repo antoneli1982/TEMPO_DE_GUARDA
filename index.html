@@ -473,6 +473,7 @@ tr.total>td.k{background:var(--navy);color:#fff}
 
     <div id="pgGraficos" style="display:flex;flex-direction:column;gap:14px">
     <section class="charts" id="charts">
+      <div class="card ch c12"><div class="card-h"><h3>Acompanhamento diário</h3><span class="sub" id="s7">por dia operacional (06:00 às 06:00)</span></div><div class="plot" id="c7"></div></div>
       <div class="card ch c6"><div class="card-h"><h3>Tempo médio por</h3><select class="selmini" id="selDimGraf" title="Escolha o agrupamento deste gráfico"></select></div><div class="plot" id="c1"></div></div>
       <div class="card ch c6"><div class="card-h"><h3>Volume e tempo por mês</h3><span class="sub">barras = OTs · linha = tempo médio</span></div><div class="plot" id="c2"></div></div>
       <div class="card ch c6"><div class="card-h"><h3>Distribuição por faixa de tempo</h3><span class="sub">% das OTs confirmadas</span></div><div class="plot" id="c3"></div></div>
@@ -610,7 +611,7 @@ function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('on
 function debounce(fn,ms){ let t; return (...a)=>{clearTimeout(t); t=setTimeout(()=>fn(...a),ms)}; }
 function ocupado(txt){ const o=$('#busy'); if(txt){ $('#busyTxt').textContent=txt; o.classList.add('on'); } else o.classList.remove('on'); }
 
-function parseNum(v){
+function parseNum(v,pontoMilhar){
   if(typeof v==='number') return v;
   if(v==null) return 0;
   let s=String(v).trim().replace(/\s/g,'');
@@ -618,8 +619,28 @@ function parseNum(v){
   const c=s.lastIndexOf(','), p=s.lastIndexOf('.');
   if(c>-1&&p>-1) s = c>p ? s.replace(/\./g,'').replace(',','.') : s.replace(/,/g,'');
   else if(c>-1) s = s.replace(/\./g,'').replace(',','.');
+  else if(p>-1&&pontoMilhar) s = s.replace(/\./g,'');   // 1.234 e 25.000 são milhares, não decimais
   const n=parseFloat(s);
   return isFinite(n)?n:0;
+}
+/* Decide, olhando a coluna inteira, se o ponto é separador de milhar.
+   "1.234" sozinho é 1234 numa base brasileira, mas "2.5" e "0,750" mostram o contrário. */
+function detectarPontoMilhar(valores){
+  let comVirgula=0, milhar=0, decimal=0, multiplos=0;
+  for(const v of valores){
+    const s=String(v==null?'':v).trim().replace(/\s/g,'');
+    if(!s) continue;
+    if(s.includes(',')){ comVirgula++; continue; }
+    const pontos=(s.match(/\./g)||[]).length;
+    if(!pontos) continue;
+    if(pontos>1){ multiplos++; continue; }               // 1.000.000 só faz sentido como milhar
+    if(/^-?0\.\d+$/.test(s)){ decimal++; continue; }      // 0.750 nunca é milhar
+    if(/^-?\d{1,3}\.\d{3}$/.test(s)) milhar++;
+    else decimal++;                                       // 2.5 · 12.75 · 1234.5
+  }
+  if(multiplos) return true;
+  if(decimal) return false;
+  return milhar>0||comVirgula>0;
 }
 /* data dd/mm/aaaa (ou aaaa-mm-dd) + hora hh:mm[:ss] opcional, em um só passo */
 function parseDT(d,h){
@@ -662,6 +683,19 @@ function horaInput(ts){
   if(ts==null||!isFinite(ts)) return '';
   const d=new Date(ts);
   return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
+}
+/* ---- dia operacional: começa às 06:00 e termina às 06:00 do dia seguinte ---- */
+const HORA_DIA_OP = String(Math.floor(TURNOS['1'].inicio/60)).padStart(2,'0')+':'+
+                    String(TURNOS['1'].inicio%60).padStart(2,'0')+':00';
+const maisUmDia = ts => { const d=new Date(ts); return new Date(d.getFullYear(),d.getMonth(),d.getDate()+1,d.getHours(),d.getMinutes(),d.getSeconds()).getTime(); };
+/* timestamp em que começa o dia operacional a que o instante pertence */
+function inicioDiaOp(ts){
+  if(ts==null||!isFinite(ts)) return null;
+  const d=new Date(ts), m=d.getHours()*60+d.getMinutes();
+  const base=new Date(d.getFullYear(),d.getMonth(),d.getDate(),0,0,0);
+  if(m<TURNOS['1'].inicio) base.setDate(base.getDate()-1);
+  base.setMinutes(TURNOS['1'].inicio);
+  return base.getTime();
 }
 function normalizarHoraDigitada(valor){
   const s=String(valor==null?'':valor).trim();
@@ -806,7 +840,7 @@ const ST = {
   dims:['predio'], mets:['tmed'], rowsF:null,
   ver:{kpis:true,graficos:true,tabela:true}, filtrosAbertos:true, cores:{}, destaque:null,
   pagina:'painel', sujo:{painel:true,dados:true}, dimGraf:'predio',
-  f:{ini:null,fim:null,sets:{},faixas:new Set(),soAtraso:false,soAberta:false,busca:''},
+  f:{ini:null,fim:null,fimExclusivo:false,sets:{},faixas:new Set(),soAtraso:false,soAberta:false,busca:''},
   aberto:new Set(), autoExp:true, sort:{k:'tmed',dir:-1}, tbusca:'', arv:null
 };
 
@@ -1096,6 +1130,14 @@ function montar(linhas, header){
   ST.turnCols={cria:colunaTurno(header,'cria'),conf:colunaTurno(header,'conf')};
   const IN=interner();
   const g=(L,c)=> c!=null&&idx[c]!=null ? (L[idx[c]]||'').trim() : '';
+  /* formato numérico da coluna de quantidade, decidido pela coluna inteira */
+  ST.qtdPontoMilhar=false; ST.qtdExemplos=[];
+  if(M.qtd&&idx[M.qtd]!=null){
+    const brutos=[];
+    for(const L of linhas){ const v=g(L,M.qtd); if(v) brutos.push(v); }
+    ST.qtdPontoMilhar=detectarPontoMilhar(brutos);
+    ST.qtdExemplos=[...new Set(brutos.filter(v=>/[.,]/.test(v)))].slice(0,4);
+  }
   const rows=[];
   ST.linhasFonte=linhas.length; ST.linhasDescartadas=0; ST.dataCriaInvalida=0; ST.dataConfInvalida=0;
   for(let i=0;i<linhas.length;i++){
@@ -1115,7 +1157,7 @@ function montar(linhas, header){
       predio: IN(g(L,M.predio)||'—'),
       material: IN(g(L,M.material)||'—'),
       tipo: IN(g(L,M.tipo)||'—'),
-      qtd: M.qtd? parseNum(g(L,M.qtd)) : 1,
+      qtd: M.qtd? parseNum(g(L,M.qtd),ST.qtdPontoMilhar) : 1,
       tsC: isFinite(tsC)?tsC:null,
       tsF: isFinite(tsF)?tsF:null,
       tsG: isFinite(tsG)?tsG:null,
@@ -1216,7 +1258,8 @@ const METRICAS = [
   {id:'tmed',   lbl:'Tempo médio',        cur:'dur', f:a=>a.c>0?a.s/a.c:null,         bar:true, sla:true, dica:'Média do tempo entre criar e confirmar a OT. É o indicador principal.'},
   {id:'pctSLA', lbl:'% acima da meta',    cur:'pct', f:a=>a.c>0?100*a.fora/a.c:null,  pill:true, dica:'Percentual de OTs que passaram da meta de tempo definida na barra lateral.'},
   {id:'naoConf',lbl:'Em aberto',          cur:'int', f:a=>a.ab||null,                 dica:'OTs criadas e ainda não confirmadas. Não entram no cálculo do tempo.'},
-  {id:'qtd',    lbl:'Quantidade',         cur:'int', f:a=>a.q,                        dica:'Soma das peças movimentadas.'},
+  {id:'qtd',    lbl:'Quantidade',         cur:'int', f:a=>a.q,                        dica:'Soma das peças de todas as OTs do grupo, confirmadas ou não.'},
+  {id:'qtdG',   lbl:'Quantidade guardada',cur:'int', f:a=>a.qc,                       dica:'Soma das peças apenas das OTs já confirmadas.'},
   {id:'tmed50', lbl:'Metade até',         cur:'dur', f:a=>quantil(a.hist,.5), sla:true,dica:'Metade das OTs foi confirmada em até esse tempo (mediana).'},
   {id:'p90',    lbl:'90% até',            cur:'dur', f:a=>quantil(a.hist,.9),         dica:'90% das OTs foram confirmadas em até esse tempo. Mostra o pior cenário comum.'},
   {id:'p95',    lbl:'95% até',            cur:'dur', f:a=>quantil(a.hist,.95),        dica:'95% das OTs foram confirmadas em até esse tempo.'},
@@ -1249,7 +1292,8 @@ function filtrar(){
   for(const id in f.sets){ const s=f.sets[id], d=dimPorId(id); if(s&&s.size&&d) pares.push([d,s]); }
   for(const r of ST.rows){
     if(f.ini!=null && r.ts<f.ini) continue;
-    if(f.fim!=null && r.ts>f.fim) continue;
+    /* fim exclusivo no dia operacional: 06:00 em ponto já é o dia seguinte */
+    if(f.fim!=null && (f.fimExclusivo ? r.ts>=f.fim : r.ts>f.fim)) continue;
     let ok=true;
     for(const [d,s] of pares) if(!s.has(String(d.g(r)))){ ok=false; break; }
     if(!ok) continue;
@@ -1267,12 +1311,13 @@ function filtrar(){
    ============================================================ */
 let PESADAS=false;
 function novoAgg(){
-  const a={n:0,q:0,s:0,c:0,mx:0,fora:0,rap:0,ab:0,ds:0,dc:0,d0:0,last:0,hist:new Map()};
+  const a={n:0,q:0,qc:0,s:0,c:0,mx:0,fora:0,rap:0,ab:0,ds:0,dc:0,d0:0,last:0,hist:new Map()};
   if(PESADAS){ a.mats=new Set(); a.usrs=new Set(); }
   return a;
 }
 function somar(a,r,sla,imed,usr){
   a.n++; a.q+=r.qtd;
+  if(r.tsF!=null) a.qc+=r.qtd;          // guardada = OT confirmada
   if(r.min!=null){
     a.s+=r.min; a.c++; if(r.min>a.mx)a.mx=r.min;
     const b=Math.round(r.min); a.hist.set(b,(a.hist.get(b)||0)+1);
@@ -1883,7 +1928,7 @@ async function painelParaJPEG(){
     const a=ST.arv.a, med=a.c>0?a.s/a.c:null;
     const kpis=[['Tempo médio de guarda',dur(med)],['Acima da meta',a.c?nf1.format(100*a.fora/a.c)+'%':'—'],
       ['OTs no recorte',nf0.format(a.n)],['Metade guardada em',dur(quantil(a.hist,.5))],
-      ['OTs em aberto',nf0.format(a.ab)],['Quantidade',nf0.format(a.q)]];
+      ['OTs em aberto',nf0.format(a.ab)],['Qtd. guardada',nf0.format(a.qc)]];
     let y=78+16, linhas=[], i=0;
     while(i<imgs.length){
       const par = imgs[i].larga ? [imgs[i]] : imgs.slice(i,i+2).filter(x=>!x.larga);
@@ -1976,8 +2021,9 @@ function renderFiltros(){
       '</div></div>'+
       '</div><div class="periodo-ajuda">Usa a confirmação quando ela é válida e a criação nos demais casos.</div>'+
       '<div class="periodo-ajuda">Digite a hora no formato HH:MM ou HH:MM:SS.</div>'+
+      '<div class="periodo-ajuda"><b>Só a data, sem hora:</b> vale o dia operacional inteiro — começa às 06:00 da data informada e termina às 06:00 do dia seguinte, fechando os três turnos.</div>'+
       '<div class="periodo-ajuda"><b>Turnos:</b> 1º das 06:00 às 15:00, 2º das 15:00 às 23:45 e 3º das 21:50 às 06:00 do dia seguinte.</div>'+
-      '<div class="quick"><button data-d="7">7 d</button><button data-d="30">30 d</button><button data-d="90">90 d</button>'+
+      '<div class="quick"><button data-d="op">Último dia op.</button><button data-d="7">7 d</button><button data-d="30">30 d</button><button data-d="90">90 d</button>'+
       '<button data-d="180">6 m</button><button data-d="0"'+(ST.f.ini==null&&ST.f.fim==null?' class="on"':'')+'>Tudo</button></div>', true);
   const feitos=new Set();
   for(const at of ORDEM_FILTROS){
@@ -2025,27 +2071,46 @@ function renderFiltros(){
     $('#fFimData').value=dataInput(ST.f.fim);
     $('#fFimHora').value=horaInput(ST.f.fim);
   }
-  function lerPeriodo(idData,idHora,rotulo){
+  /* Só a data preenchida: assume o dia operacional inteiro.
+     Início = data às 06:00 · Fim = dia seguinte à data informada às 06:00. */
+  function lerPeriodo(idData,idHora,rotulo,lado){
     const data=$(idData).value.trim(), horaOriginal=$(idHora).value.trim();
-    if(!data&&!horaOriginal) return {completo:true,valor:null};
-    if(!data||!horaOriginal) return {completo:false,valor:null};
+    if(!data&&!horaOriginal) return {completo:true,valor:null,soData:false};
+    if(!data) return {completo:false,valor:null,soData:false};
+    if(!horaOriginal){
+      const base=parseDT(data,HORA_DIA_OP);
+      if(!isFinite(base)) throw new Error('Revise a data de '+rotulo+'.');
+      return {completo:true, valor: lado==='fim'? maisUmDia(base) : base, soData:true};
+    }
     const hora=normalizarHoraDigitada(horaOriginal);
     if(hora==null) throw new Error('Digite a hora de '+rotulo+' no formato HH:MM ou HH:MM:SS.');
     const valor=parseDT(data,hora);
     if(!isFinite(valor)) throw new Error('Revise a data e a hora de '+rotulo+'.');
     $(idHora).value=hora;
-    return {completo:true,valor};
+    return {completo:true,valor,soData:false};
   }
   function atualizarPeriodoDigitado(){
     try{
-      const inicio=lerPeriodo('#fIniData','#fIniHora','início');
-      const fim=lerPeriodo('#fFimData','#fFimHora','fim');
+      const inicio=lerPeriodo('#fIniData','#fIniHora','início','ini');
+      let fim=lerPeriodo('#fFimData','#fFimHora','fim','fim');
       if(!inicio.completo||!fim.completo) return;
+      /* só a data de início, sem fim nenhum: fecha o dia operacional completo */
+      let fechouSozinho=false;
+      if(inicio.soData && fim.valor==null && !$('#fFimData').value.trim()){
+        fim={completo:true,valor:maisUmDia(inicio.valor),soData:true};
+        fechouSozinho=true;
+      }
       if(inicio.valor!=null&&fim.valor!=null&&inicio.valor>fim.valor)
         throw new Error('A data e hora de início precisam ser anteriores à data e hora de fim.');
       ST.f.ini=inicio.valor;
       ST.f.fim=fim.valor;
+      ST.f.fimExclusivo=!!(fim.soData||fechouSozinho);
       s.querySelectorAll('.quick button').forEach(b=>b.classList.remove('on'));
+      if(inicio.soData||fim.soData||fechouSozinho){
+        preencherPeriodo();
+        toast('Dia operacional: '+(ST.f.ini!=null?dataHoraBR(ST.f.ini):'início da base')+
+              ' até '+(ST.f.fim!=null?dataHoraBR(ST.f.fim):'fim da base')+'.');
+      }
       atualizar();
     }catch(e){
       toast(e.message);
@@ -2068,9 +2133,17 @@ function renderFiltros(){
   });
   s.querySelectorAll('.quick button').forEach(b=>b.onclick=()=>{
     s.querySelectorAll('.quick button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+    if(b.dataset.d==='op'){
+      const ini=inicioDiaOp(ST.maxTs);
+      ST.f.ini=ini; ST.f.fim=maisUmDia(ini); ST.f.fimExclusivo=true;
+      preencherPeriodo(); atualizar();
+      toast('Dia operacional: '+dataHoraBR(ST.f.ini)+' até '+dataHoraBR(ST.f.fim)+'.');
+      return;
+    }
     const d=+b.dataset.d;
     ST.f.fim = d? ST.maxTs : null;
     ST.f.ini = d? ST.maxTs-d*86400000 : null;
+    ST.f.fimExclusivo=false;
     preencherPeriodo();
     atualizar();
   });
@@ -2078,7 +2151,7 @@ function renderFiltros(){
   $('#fAtraso').onchange=()=>{ ST.f.soAtraso=$('#fAtraso').checked; atualizar(); };
   $('#fAberta').onchange=()=>{ ST.f.soAberta=$('#fAberta').checked; atualizar(); };
   $('#fBusca').oninput=debounce(()=>{ ST.f.busca=$('#fBusca').value; atualizar(); },300);
-  $('#fLimpar').onclick=()=>{ ST.f={ini:null,fim:null,sets:{},faixas:new Set(),soAtraso:false,soAberta:false,busca:''}; renderFiltros(); atualizar(); };
+  $('#fLimpar').onclick=()=>{ ST.f={ini:null,fim:null,fimExclusivo:false,sets:{},faixas:new Set(),soAtraso:false,soAberta:false,busca:''}; renderFiltros(); atualizar(); };
   contadores();
 }
 function contadores(){
@@ -2165,7 +2238,7 @@ function renderKPIs(){
     ['OTs no recorte', nf0.format(a.n), '', nf0.format(a.c)+' confirmadas · '+nf0.format(a.ab)+' em aberto'],
     ['Metade foi guardada em', dur(p50), '', 'e 9 em cada 10, em até '+dur(p90)],
     ['OTs em aberto', nf0.format(a.ab), '', ST.maisAntiga?'a mais antiga é de '+new Date(ST.maisAntiga).toLocaleDateString('pt-BR'):'nenhuma pendência', a.ab>0?'warn':''],
-    ['Quantidade guardada', nf0.format(a.q), '', a.dc?nf1.format(100*a.d0/a.dc)+'% no mesmo dia da entrada':'—']
+    ['Quantidade guardada', nf0.format(a.qc), '', nf0.format(a.q)+' no recorte'+(a.dc?' · '+nf1.format(100*a.d0/a.dc)+'% no mesmo dia da entrada':'')]
   ];
   $('#kpis').innerHTML=cards.map(c=>
     '<div class="kpi '+(c[4]||'')+'"><div class="eyebrow">'+esc(c[0])+'</div><div class="v">'+c[1]+
@@ -2353,6 +2426,134 @@ function gHeat(id,grade,cont){
   n.innerHTML=s+'</svg>';
 }
 
+/* série por dia operacional, preenchendo os dias sem movimento */
+const MAX_DIAS_DIARIO = 400;
+function serieDiaria(rows){
+  const mp=new Map();
+  for(const r of rows){
+    let o=mp.get(r.dia);
+    if(!o){ o={n:0,q:0,qc:0,s:0,c:0,fora:0,ab:0}; mp.set(r.dia,o); }
+    o.n++; o.q+=r.qtd;
+    if(!r.aberta&&!r.confInvalida) o.qc+=r.qtd;
+    if(r.aberta) o.ab++;
+    if(r.min!=null){ o.s+=r.min; o.c++; if(r.min>ST.sla) o.fora++; }
+  }
+  const chaves=[...mp.keys()].sort();
+  if(!chaves.length) return [];
+  const vazioDia=()=>({n:0,q:0,qc:0,s:0,c:0,fora:0,ab:0});
+  const montaDia=(iso0,o)=>{
+    const d=new Date(parseDT(iso0,'00:00:00'));
+    return Object.assign({
+      k:iso0, dsem:d.getDay(),
+      rot:String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0'),
+      rotLongo:d.toLocaleDateString('pt-BR')
+    },o);
+  };
+  const t0=parseDT(chaves[0],'00:00:00'), t1=parseDT(chaves[chaves.length-1],'00:00:00');
+  const vaos=Math.round((t1-t0)/86400000);
+  if(!(vaos>=0)||vaos>MAX_DIAS_DIARIO) return chaves.map(k=>montaDia(k,mp.get(k)));
+  const out=[], cur=new Date(t0);
+  for(let i=0;i<=vaos;i++){
+    const k=iso(cur.getTime());
+    out.push(montaDia(k,mp.get(k)||vazioDia()));
+    cur.setDate(cur.getDate()+1);
+  }
+  return out;
+}
+
+/* acompanhamento diário: barras empilhadas (dentro/fora da meta/em aberto) + tempo médio */
+function gDiario(id,dias){
+  const E=esq(id.slice(1)), n=$(id);
+  if(!dias.length){ n.innerHTML=vazio('Sem OTs no recorte.'); return; }
+  const w=larg(id), h=dias.length>60?318:296, pl=52, pr=60, pt=18, pb=46, iw=w-pl-pr, ih=h-pt-pb;
+  const ys=ticks(Math.max(1,...dias.map(d=>d.n)),4), ymax=ys[ys.length-1];
+  const tempos=dias.map(d=>d.c?d.s/d.c:null);
+  const ls=ticks(Math.max(1,ST.sla,...tempos.filter(v=>v!=null)),4), lmax=ls[ls.length-1];
+  const cw=iw/dias.length, bw=Math.min(30,Math.max(1.6,cw*.62));
+  const corOk = E.semaforo? 'var(--green)' : E.cores[0];
+  const corFora = E.semaforo? 'var(--red)'   : E.cores[4]||E.cores[2];
+  const corAb = '#C0CAD3';
+  const corL = E.linha;
+  const Y = v => pt+ih-ih*Math.min(v,ymax)/ymax;
+  const YL = v => pt+ih-ih*Math.min(v,lmax)/lmax;
+  let s=svgAbre(w,h);
+
+  /* fundo dos fins de semana */
+  dias.forEach((d,i)=>{ if(d.dsem===0||d.dsem===6)
+    s+='<rect x="'+(pl+cw*i)+'" y="'+pt+'" width="'+cw+'" height="'+ih+'" fill="var(--slate)" opacity=".05"/>'; });
+
+  ys.forEach(t=>{ s+='<line class="gridline" x1="'+pl+'" y1="'+Y(t)+'" x2="'+(w-pr)+'" y2="'+Y(t)+'"/>'+
+    '<text class="axis" x="'+(pl-7)+'" y="'+(Y(t)+3.5)+'" text-anchor="end">'+nf0.format(t)+'</text>'; });
+  ls.forEach(t=>{ s+='<text class="axis" x="'+(w-pr+7)+'" y="'+(YL(t)+3.5)+'" fill="'+corL+'">'+dur(t)+'</text>'; });
+
+  /* meta no eixo da direita */
+  if(ST.sla<=lmax) s+='<line x1="'+pl+'" y1="'+YL(ST.sla)+'" x2="'+(w-pr)+'" y2="'+YL(ST.sla)+'" stroke="var(--navy)" stroke-width="1" stroke-dasharray="3 3"/>'+
+    '<text class="axis" x="'+(w-pr-5)+'" y="'+(YL(ST.sla)-5)+'" text-anchor="end" fill="var(--navy)">meta '+dur(ST.sla)+'</text>';
+
+  /* colunas empilhadas */
+  dias.forEach((d,D)=>{
+    const cx=pl+cw*D+cw/2, x=cx-bw/2;
+    const dentro=d.c-d.fora, blocos=[[dentro,corOk],[d.fora,corFora],[d.ab,corAb]];
+    let base=pt+ih;
+    for(const [v,cor] of blocos){
+      if(!(v>0)) continue;
+      const bh=ih*v/ymax; base-=bh;
+      s+='<rect class="bar" x="'+x+'" y="'+base+'" width="'+bw+'" height="'+Math.max(.8,bh)+'" fill="'+cor+'"/>';
+    }
+  });
+
+  /* linha do tempo médio */
+  let dP='',pts='';
+  dias.forEach((d,i)=>{
+    if(tempos[i]==null) return;
+    const x=pl+cw*i+cw/2, y=YL(tempos[i]);
+    dP+=(dP?'L':'M')+x+' '+y+' ';
+    if(dias.length<=45) pts+='<circle cx="'+x+'" cy="'+y+'" r="3" fill="#fff" stroke="'+corL+'" stroke-width="2"/>';
+  });
+  s+='<path d="'+dP+'" fill="none" stroke="'+corL+'" stroke-width="2" stroke-linejoin="round"/>'+pts;
+
+  /* média móvel de 7 dias */
+  if(dias.length>=10){
+    let dM='';
+    for(let i=0;i<dias.length;i++){
+      let sm=0,c=0;
+      for(let j=Math.max(0,i-6);j<=i;j++){ sm+=dias[j].s; c+=dias[j].c; }
+      if(!c) continue;
+      dM+=(dM?'L':'M')+(pl+cw*i+cw/2)+' '+YL(sm/c)+' ';
+    }
+    s+='<path d="'+dM+'" fill="none" stroke="var(--navy)" stroke-width="1.6" stroke-dasharray="5 3" opacity=".75"/>';
+  }
+
+  /* rótulos do eixo x */
+  const passo=Math.max(1,Math.ceil(dias.length/Math.max(4,Math.floor(iw/62))));
+  dias.forEach((d,i)=>{ if(i%passo) return;
+    s+='<text class="axis" x="'+(pl+cw*i+cw/2)+'" y="'+(h-24)+'" text-anchor="middle">'+d.rot+'</text>';
+    if(dias.length<=45) s+='<text class="axis" x="'+(pl+cw*i+cw/2)+'" y="'+(h-13)+'" text-anchor="middle" opacity=".7">'+DSEM[d.dsem].slice(0,3)+'</text>';
+  });
+
+  /* área sensível de cada dia */
+  dias.forEach((d,i)=>{
+    const tmed=d.c?d.s/d.c:null;
+    const tip=d.rotLongo+' · '+DSEM[d.dsem]+'<br><b>'+nf0.format(d.n)+'</b> OTs'+
+      (d.c?'<br>Tempo médio <b>'+dur(tmed)+'</b>':'<br>sem confirmação no dia')+
+      (d.c?'<br>'+nf0.format(d.fora)+' acima da meta ('+nf1.format(100*d.fora/d.c)+'%)':'')+
+      (d.ab?'<br>'+nf0.format(d.ab)+' em aberto':'')+
+      '<br>Quantidade guardada '+nf0.format(d.qc)+' de '+nf0.format(d.q)+
+      '<br><span style="opacity:.7">06:00 de '+d.rotLongo+' às 06:00 do dia seguinte</span>';
+    s+='<rect x="'+(pl+cw*i)+'" y="'+pt+'" width="'+cw+'" height="'+ih+'" fill="#fff" fill-opacity="0.001" data-tip="'+esc(tip)+'"/>';
+  });
+
+  const totN=dias.reduce((a,d)=>a+d.n,0), totC=dias.reduce((a,d)=>a+d.c,0), totF=dias.reduce((a,d)=>a+d.fora,0);
+  n.innerHTML=s+'</svg><div class="legend">'+
+    '<span><i style="background:'+corOk+'"></i>dentro da meta</span>'+
+    '<span><i style="background:'+corFora+'"></i>acima da meta</span>'+
+    '<span><i style="background:'+corAb+'"></i>em aberto</span>'+
+    '<span><i style="background:'+corL+'"></i>tempo médio (eixo direito)</span>'+
+    '<span><i style="background:var(--navy)"></i>média móvel de 7 dias</span>'+
+    '<span>· média de '+nf1.format(totN/dias.length)+' OTs por dia'+
+    (totC?' · '+nf1.format(100*totF/totC)+'% acima da meta no período':'')+'</span></div>';
+}
+
 function renderGrafico1(rows){
   const d=dimPorId(ST.dimGraf)||dimPorId('predio');
   const mp=new Map();
@@ -2379,6 +2580,12 @@ function renderGraficos(rows){
   gCombo('#c2',cats,cats.map(c=>mm.get(c).n),[
     {k:'Tempo médio',c:esq('c2').linha,v:cats.map(c=>{const o=mm.get(c);return o.c?o.s/o.c:null})}
   ]);
+
+  const sd=serieDiaria(rows);
+  if($('#s7')) $('#s7').textContent = sd.length
+    ? 'dia operacional das 06:00 às 06:00 · '+sd[0].rotLongo+' a '+sd[sd.length-1].rotLongo+' ('+nf0.format(sd.length)+' dias)'
+    : 'dia operacional das 06:00 às 06:00';
+  gDiario('#c7',sd);
 
   const fx=CFG.FAIXAS.map(()=>0);
   for(const r of rows) if(r.min!=null) fx[r.faixa]++;
@@ -2537,6 +2744,7 @@ function abaParametros(){
     ['Turnos operacionais','1º turno: 06:00 a 15:00; 2º turno: 15:00 a 23:45; 3º turno: 21:50 a 06:00 do dia seguinte'],
     ['Sobreposição dos turnos','Entre 21:50 e 23:45, usa o turno válido informado no arquivo. Sem essa informação, o registro fica identificado para conferência.'],
     ['Data operacional','No 3º turno, registros entre 00:00 e 06:00 pertencem à data em que o turno começou.'],
+    ['Filtro só com data, sem hora','Início às 06:00 da data informada e fim às 06:00 do dia seguinte, cobrindo o dia operacional completo.'],
     ['Registros no intervalo comum sem turno válido',nf0.format(ST.turnoAmbiguo)],
     ['Registros com turno informado incompatível',nf0.format(ST.turnoConflito)],
     ['Linhas recebidas da fonte',nf0.format(ST.linhasFonte)],
@@ -2544,6 +2752,11 @@ function abaParametros(){
     ['Registros sem data válida de criação',nf0.format(ST.dataCriaInvalida)],
     ['Registros com confirmação preenchida e inválida',nf0.format(ST.dataConfInvalida)],
     ['Registros com confirmação anterior à criação',nf0.format(ST.duracaoNegativa)],
+    ['Coluna de quantidade',ST.mapa.qtd||'não mapeada — cada OT conta como 1'],
+    ['Leitura do separador na quantidade',ST.qtdPontoMilhar?'ponto lido como separador de milhar (1.234 = 1234)':'ponto lido como separador decimal (1.234 = 1,234)'],
+    ['Exemplos lidos na coluna de quantidade',(ST.qtdExemplos&&ST.qtdExemplos.length)?ST.qtdExemplos.map(v=>v+' = '+nf0.format(parseNum(v,ST.qtdPontoMilhar))).join(' · '):'sem valores com ponto ou vírgula'],
+    ['Quantidade guardada no recorte',nf0.format(ST.arv.a.qc)],
+    ['Quantidade total no recorte',nf0.format(ST.arv.a.q)],
     ['Unidade dos tempos','minutos'],
     ['SLA aplicado',ST.sla+' minutos'],
     ['Guarda imediata','até '+CFG.IMEDIATO_MIN+' minutos'],
@@ -2697,7 +2910,7 @@ function concluir(header,linhas,nome,t0,mapaPreferido,remota){
     return false;
   }
   $('#vazio').style.display='none'; $('#painel').style.display='';
-  ST.f={ini:null,fim:null,sets:{},faixas:new Set(),soAtraso:false,soAberta:false,busca:''};
+  ST.f={ini:null,fim:null,fimExclusivo:false,sets:{},faixas:new Set(),soAtraso:false,soAberta:false,busca:''};
   ST.tbusca='';
   if($('#tSearch')) $('#tSearch').value='';
   ST.dims=[idReal('predio')].filter(id=>dimPorId(id));
