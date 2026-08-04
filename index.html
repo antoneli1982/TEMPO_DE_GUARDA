@@ -1256,12 +1256,6 @@ function preparar(){
     if(ts<ST.minTs)ST.minTs=ts; if(ts>ST.maxTs)ST.maxTs=ts;
   }
   ST.qtdBase=0; for(const r of ST.rows) ST.qtdBase+=r.qtd;
-  ST.otsBase=null; ST.linhasPorOT=1;
-  if(ST.colOT){
-    const u=new Set(); for(const r of ST.rows) if(r.ot) u.add(r.ot);
-    ST.otsBase=u.size;
-    ST.linhasPorOT = u.size? ST.rows.length/u.size : 1;
-  }
   // curva ABC por quantidade
   const q=new Map();
   for(const r of ST.rows) q.set(r.material,(q.get(r.material)||0)+r.qtd);
@@ -1309,7 +1303,7 @@ function idReal(id){                                   // aceita 'dep' como atal
 }
 
 const METRICAS = [
-  {id:'ots',    lbl:'Linhas',             cur:'int', f:a=>a.n,                        dica:'Linhas do extrato no grupo. Se a mesma OT ocupa várias linhas, use OTs únicas.'},
+  {id:'ots',    lbl:'OTs',                cur:'int', f:a=>a.n,                        dica:'Contagem de ordens de transporte no grupo, uma por linha do extrato.'},
   {id:'tmed',   lbl:'Tempo médio',        cur:'dur', f:a=>a.c>0?a.s/a.c:null,         bar:true, sla:true, dica:'Média do tempo entre criar e confirmar a OT. É o indicador principal.'},
   {id:'pctSLA', lbl:'% acima da meta',    cur:'pct', f:a=>a.c>0?100*a.fora/a.c:null,  pill:true, dica:'Percentual de OTs que passaram da meta de tempo definida na barra lateral.'},
   {id:'naoConf',lbl:'Em aberto',          cur:'int', f:a=>a.ab||null,                 dica:'OTs criadas e ainda não confirmadas. Não entram no cálculo do tempo.'},
@@ -1326,7 +1320,6 @@ const METRICAS = [
   {id:'mats',   lbl:'Materiais',          cur:'int', f:a=>a.mats?a.mats.size:null, pesada:true, dica:'Quantos materiais diferentes aparecem no grupo.'},
   {id:'usrs',   lbl:'Usuários',           cur:'int', f:a=>a.usrs?a.usrs.size:null, pesada:true, dica:'Quantos usuários confirmaram OTs no grupo.'},
   {id:'hus',    lbl:'HUs',               cur:'int', f:a=>a.hus?a.hus.size:null, pesada:true, dica:'Quantas unidades de manuseio (HU) diferentes aparecem no grupo.'},
-  {id:'otsU',   lbl:'OTs únicas',        cur:'int', f:a=>a.ots?a.ots.size:null, pesada:true, dica:'Ordens de transporte distintas no grupo. Difere de OTs quando a mesma ordem ocupa várias linhas do extrato.'},
   {id:'ult',    lbl:'Última confirmação', cur:'date',f:a=>a.last||null,               dica:'Data da confirmação mais recente do grupo.'}
 ];
 const metPorId = id => METRICAS.find(m=>m.id===id);
@@ -1369,7 +1362,7 @@ function filtrar(){
 let PESADAS=false;
 function novoAgg(){
   const a={n:0,q:0,qc:0,s:0,c:0,mx:0,fora:0,rap:0,ab:0,ds:0,dc:0,d0:0,last:0,hist:new Map()};
-  if(PESADAS){ a.mats=new Set(); a.usrs=new Set(); a.hus=new Set(); a.ots=new Set(); }
+  if(PESADAS){ a.mats=new Set(); a.usrs=new Set(); a.hus=new Set(); }
   return a;
 }
 function somar(a,r,sla,imed,usr){
@@ -1384,7 +1377,7 @@ function somar(a,r,sla,imed,usr){
   if(r.aberta) a.ab++;
   if(r.dias!=null){ a.ds+=r.dias; a.dc++; if(r.dias===0) a.d0++; }
   if(r.tsF!=null&&r.tsF>a.last) a.last=r.tsF;
-  if(a.mats){ a.mats.add(r.material); if(usr) a.usrs.add(usr.g(r)); if(r.hu) a.hus.add(r.hu); if(r.ot) a.ots.add(r.ot); }
+  if(a.mats){ a.mats.add(r.material); if(usr) a.usrs.add(usr.g(r)); if(r.hu) a.hus.add(r.hu); }
 }
 function construirArvore(rows, dims){
   PESADAS = ST.mets.some(id=>{const m=metPorId(id); return m&&m.pesada;});
@@ -2305,22 +2298,16 @@ function renderKPIs(rows){
     for(const r of (rows||[])){ if(!r.hu) continue; t.add(r.hu); if(r.tsF!=null) g.add(r.hu); }
     hus=t.size; husG=g.size;
   }
-  /* cada ordem de transporte conta uma vez, mesmo ocupando várias linhas do extrato */
+  /* contagem simples da coluna de OT: uma linha preenchida, uma OT */
   let ots=null;
-  if(ST.colOT){
-    const u=new Set();
-    for(const r of (rows||[])) if(r.ot) u.add(r.ot);
-    ots=u.size;
-  }
+  if(ST.colOT){ ots=0; for(const r of (rows||[])) if(r.ot) ots++; }
   const med=a.c>0?a.s/a.c:null, p50=quantil(a.hist,.5), p90=quantil(a.hist,.9);
   const pctS=a.c>0?100*a.fora/a.c:null, pct15=a.c>0?100*a.rap/a.c:null;
   const cls=v=>v==null?'':(v>ST.sla?'bad':v>ST.sla*.75?'warn':'');
   const cards=[
     ['Tempo médio de guarda', dur(med), '', 'da criação da OT até a confirmação', cls(med)],
     ['Acima da meta de '+dur(ST.sla), pctS==null?'—':nf1.format(pctS), '%', pctS==null?'—':nf0.format(a.fora)+' OTs passaram da meta', pctS==null?'':(pctS>25?'bad':pctS>15?'warn':'')],
-    ['OTs no recorte', nf0.format(ots==null?a.n:ots), '',
-      (ots==null? nf0.format(a.c)+' confirmadas · '+nf0.format(a.ab)+' em aberto'
-                : nf0.format(a.n)+' linhas do extrato · '+nf0.format(a.ab)+' em aberto')],
+    ['OTs no recorte', nf0.format(ots==null?a.n:ots), '', nf0.format(a.c)+' confirmadas · '+nf0.format(a.ab)+' em aberto'],
     ['Metade foi guardada em', dur(p50), '', 'e 9 em cada 10, em até '+dur(p90)],
     ...(ST.colHU? [['HUs no recorte', nf0.format(hus), '', nf0.format(husG)+' já guardadas'+(hus?' · '+nf1.format(a.n/hus)+' OTs por HU':'')]] : []),
     ['OTs em aberto', nf0.format(a.ab), '', ST.maisAntiga?'a mais antiga é de '+new Date(ST.maisAntiga).toLocaleDateString('pt-BR'):'nenhuma pendência', a.ab>0?'warn':''],
@@ -2523,9 +2510,8 @@ function serieDiaria(rows){
   const mp=new Map();
   for(const r of rows){
     let o=mp.get(r.dia);
-    if(!o){ o={n:0,q:0,qc:0,s:0,c:0,fora:0,ab:0,hus:new Set(),ots:new Set()}; mp.set(r.dia,o); }
+    if(!o){ o={n:0,q:0,qc:0,s:0,c:0,fora:0,ab:0,hus:new Set()}; mp.set(r.dia,o); }
     if(r.hu) o.hus.add(r.hu);
-    if(r.ot) o.ots.add(r.ot);
     o.n++; o.q+=r.qtd;
     if(!r.aberta&&!r.confInvalida) o.qc+=r.qtd;
     if(r.aberta) o.ab++;
@@ -2533,7 +2519,7 @@ function serieDiaria(rows){
   }
   const chaves=[...mp.keys()].sort();
   if(!chaves.length) return [];
-  const vazioDia=()=>({n:0,q:0,qc:0,s:0,c:0,fora:0,ab:0,hus:new Set(),ots:new Set()});
+  const vazioDia=()=>({n:0,q:0,qc:0,s:0,c:0,fora:0,ab:0,hus:new Set()});
   const montaDia=(iso0,o)=>{
     const d=new Date(parseDT(iso0,'00:00:00'));
     return Object.assign({
@@ -2627,8 +2613,7 @@ function gDiario(id,dias){
   /* área sensível de cada dia */
   dias.forEach((d,i)=>{
     const tmed=d.c?d.s/d.c:null;
-    const tip=d.rotLongo+' · '+DSEM[d.dsem]+'<br><b>'+nf0.format(ST.colOT?d.ots.size:d.n)+'</b> OTs'+
-      (ST.colOT?' ('+nf0.format(d.n)+' linhas)':'')+
+    const tip=d.rotLongo+' · '+DSEM[d.dsem]+'<br><b>'+nf0.format(d.n)+'</b> OTs'+
       (d.c?'<br>Tempo médio <b>'+dur(tmed)+'</b>':'<br>sem confirmação no dia')+
       (d.c?'<br>'+nf0.format(d.fora)+' acima da meta ('+nf1.format(100*d.fora/d.c)+'%)':'')+
       (d.ab?'<br>'+nf0.format(d.ab)+' em aberto':'')+
@@ -2900,8 +2885,6 @@ function abaParametros(){
     ['Quantidade total da coluna na base',nf0.format(ST.qtdBase)],
     ['Coluna de impressora',ST.colImpressora||'não encontrada no arquivo'],
     ['Coluna de ordem de transporte',ST.colOT||'não encontrada no arquivo'],
-    ['OTs distintas na base',ST.otsBase==null?'—':nf0.format(ST.otsBase)],
-    ['Linhas por OT na base',ST.otsBase==null?'—':nf1.format(ST.linhasPorOT)],
     ['Coluna de HU',ST.colHU||'não encontrada no arquivo'],
     ['HUs distintas na base',ST.colHU?nf0.format(new Set(ST.rows.map(r=>r.hu).filter(Boolean)).size):'—'],
     ['Regra do tipo de papel','Impressora com PORT ou PORTATIL no nome = papel térmico; qualquer outra = papel A5; em branco = sem impressora'],
