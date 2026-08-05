@@ -1992,6 +1992,7 @@ function recorteTexto(){
 
 // Exportação preparada para impressão: inclui valores visíveis nos gráficos
 function prepararGraficoParaExportacao(svg){
+  if(!svg) return null;
   const clone = svg.cloneNode(true);
   clone.querySelectorAll('.bar').forEach(el=>{
     const tip = el.getAttribute('data-tip') || '';
@@ -2011,8 +2012,46 @@ function prepararGraficoParaExportacao(svg){
   return clone;
 }
 
+function canvasTextoAjustado(g,texto,x,y,largura,tamanho=12,peso=400,cor='#0B1E3F'){
+  let tam=tamanho;
+  const txt=String(texto||'');
+  do{
+    g.font=peso+' '+tam+'px Poppins,Arial,Helvetica,sans-serif';
+    if(g.measureText(txt).width<=largura||tam<=8) break;
+    tam-=.5;
+  }while(tam>8);
+  let saida=txt;
+  while(saida.length>1&&g.measureText(saida).width>largura) saida=saida.slice(0,-1);
+  if(saida!==txt) saida=saida.replace(/[\s.,;:]+$/,'')+'…';
+  g.fillStyle=cor;
+  g.fillText(saida,x,y);
+  return tam;
+}
+
+function canvasTextoQuebrado(g,texto,x,y,largura,alturaLinha=15,maxLinhas=2,tamanho=11,cor='#637789'){
+  g.font='400 '+tamanho+'px Poppins,Arial,Helvetica,sans-serif';
+  g.fillStyle=cor;
+  const palavras=String(texto||'').split(/\s+/).filter(Boolean), linhas=[];
+  let linha='';
+  for(const palavra of palavras){
+    const teste=linha?linha+' '+palavra:palavra;
+    if(g.measureText(teste).width<=largura) linha=teste;
+    else{ if(linha) linhas.push(linha); linha=palavra; }
+  }
+  if(linha) linhas.push(linha);
+  const visiveis=linhas.slice(0,maxLinhas);
+  if(linhas.length>maxLinhas&&visiveis.length){
+    let ultima=visiveis[maxLinhas-1];
+    while(ultima.length>1&&g.measureText(ultima+'…').width>largura) ultima=ultima.slice(0,-1);
+    visiveis[maxLinhas-1]=ultima.replace(/[\s.,;:]+$/,'')+'…';
+  }
+  visiveis.forEach((l,i)=>g.fillText(l,x,y+i*alturaLinha));
+  return visiveis.length;
+}
+
 async function graficoParaJPEG(sel, card){
-  const svg=prepararGraficoParaExportacao($(sel).querySelector('svg'));
+  const original=$(sel).querySelector('svg');
+  const svg=prepararGraficoParaExportacao(original);
   if(!svg){ toast('Este gráfico está sem dados para exportar.'); return; }
   ocupado('Gerando a imagem…');
   try{
@@ -2020,16 +2059,15 @@ async function graficoParaJPEG(sel, card){
     const vb=svg.viewBox.baseVal, W=Math.round(vb.width), H=Math.round(vb.height);
     const tit=card.querySelector('h3').textContent, subT=(card.querySelector('.sub')||{}).textContent||'';
     const leg=(card.querySelector('.legend')||{}).innerText||'';
-    const pad=22, topo=78, cab=30, rod=leg?40:24;
+    const pad=28, topo=82, cab=subT?58:38, rod=leg?54:30;
     const LW=Math.max(W+pad*2,620), LH=topo+cab+H+rod;
     const e=2, cv=document.createElement('canvas');
     cv.width=LW*e; cv.height=LH*e;
     const g=cv.getContext('2d'); g.scale(e,e);
     g.fillStyle='#fff'; g.fillRect(0,0,LW,LH);
     faixaMarca(g,LW,'Tempo de Guarda',recorteTexto());
-    g.fillStyle='#0B1E3F'; g.font='700 14px Arial,Helvetica,sans-serif';
-    g.fillText(tit,pad,topo+20);
-    if(subT){ g.fillStyle='#8A9BA9'; g.font='11px Arial,Helvetica,sans-serif'; g.fillText(subT,pad+g.measureText(tit).width+10,topo+20); }
+    canvasTextoAjustado(g,tit,pad,topo+20,LW-pad*2,16,700);
+    if(subT) canvasTextoQuebrado(g,subT,pad,topo+40,LW-pad*2,14,2,11);
     g.drawImage(img,(LW-W)/2,topo+cab,W,H);
     g.fillStyle='#8A9BA9'; g.font='10.5px Arial,Helvetica,sans-serif';
     if(leg) g.fillText(leg.replace(/\n/g,' · '),pad,topo+cab+H+14);
@@ -2055,38 +2093,45 @@ async function painelParaJPEG(){
     const cards=[...document.querySelectorAll('.ch')].filter(c=>c.querySelector('svg'));
     const imgs=[];
     for(const c of cards){
-      const svg=c.querySelector('svg'), vb=svg.viewBox.baseVal;
+      const svg=prepararGraficoParaExportacao(c.querySelector('svg')), vb=svg.viewBox.baseVal;
       imgs.push({img:await svgParaImagem(svg), w:vb.width, h:vb.height, larga:c.classList.contains('c12'),
-                 tit:c.querySelector('h3').textContent, leg:(c.querySelector('.legend')||{}).innerText||''});
+                 tit:c.querySelector('h3').textContent, sub:(c.querySelector('.sub')||{}).textContent||'',
+                 leg:(c.querySelector('.legend')||{}).innerText||''});
     }
-    const W=1280, pad=24, colW=(W-pad*3)/2;
+    const W=1600, pad=32, gap=20, colW=(W-pad*2-gap)/2;
     const a=ST.arv.a, med=a.c>0?a.s/a.c:null;
     const kpis=[['Tempo médio de guarda',dur(med)],['Acima da meta',a.c?nf1.format(100*a.fora/a.c)+'%':'—'],
       ['OTs no recorte',nf0.format(a.n)],['Metade guardada em',dur(quantil(a.hist,.5))],
       ['OTs em aberto',nf0.format(a.ab)],['Qtd. guardada',nf0.format(a.qc)],['Qtd. total',nf0.format(a.q)]];
-    let y=78+16, linhas=[], i=0;
+    let y=82+18, linhas=[], i=0;
     while(i<imgs.length){
-      const par = imgs[i].larga ? [imgs[i]] : imgs.slice(i,i+2).filter(x=>!x.larga);
-      const lw = par.length===1&&par[0].larga ? W-pad*2 : colW;
-      const alt=Math.max(...par.map(p=>p.h*lw/p.w))+(par.some(p=>p.leg)?16:0)+26;
-      linhas.push({par,alt,lw}); i+=par.length; }
-    const alturaKPI=76, alturaResumo=54;
-    const H=78+alturaKPI+alturaResumo+linhas.reduce((s,l)=>s+l.alt+14,0)+34;
+      let par;
+      if(imgs[i].larga) par=[imgs[i++]];
+      else{
+        par=[imgs[i++]];
+        if(i<imgs.length&&!imgs[i].larga) par.push(imgs[i++]);
+      }
+      const lw=par.length===1?W-pad*2:colW;
+      const graficos=par.map(p=>(lw-24)*p.h/p.w);
+      const alt=Math.max(...graficos)+88+(par.some(p=>p.leg)?34:0);
+      linhas.push({par,alt,lw});
+    }
+    const kpiCols=4, kpiGap=12, kpiW=(W-pad*2-kpiGap*(kpiCols-1))/kpiCols;
+    const kpiRows=Math.ceil(kpis.length/kpiCols), alturaKPI=kpiRows*78;
+    const alturaResumo=62;
+    const H=82+18+alturaKPI+alturaResumo+linhas.reduce((s,l)=>s+l.alt+gap,0)+38;
     const e=2, cv=document.createElement('canvas');
     cv.width=W*e; cv.height=H*e;
     const g=cv.getContext('2d'); g.scale(e,e);
     g.fillStyle='#F4F7F9'; g.fillRect(0,0,W,H);
     faixaMarca(g,W,'Painel de Tempo de Guarda',recorteTexto());
     y=78+14;
-    const kw=(W-pad*2-(kpis.length-1)*8)/kpis.length;
     kpis.forEach((k,i)=>{
-      const x=pad+i*(kw+8);
-      g.fillStyle='#fff'; g.fillRect(x,y,kw,58);
-      g.fillStyle='#3A66F5'; g.fillRect(x,y,kw,3);
-      g.fillStyle='#8A9BA9'; g.font='700 9px Arial,Helvetica,sans-serif';
-      g.fillText(k[0].toUpperCase().slice(0,26),x+10,y+21);
-      g.fillStyle='#0B1E3F'; g.font='700 19px Arial,Helvetica,sans-serif';
-      g.fillText(k[1],x+10,y+45);
+      const col=i%kpiCols, lin=Math.floor(i/kpiCols), x=pad+col*(kpiW+kpiGap), ky=y+lin*70;
+      g.fillStyle='#fff'; g.fillRect(x,ky,kpiW,58);
+      g.fillStyle='#3A66F5'; g.fillRect(x,ky,kpiW,3);
+      canvasTextoAjustado(g,k[0].toUpperCase(),x+12,ky+22,kpiW-24,10,700,'#637789');
+      canvasTextoAjustado(g,k[1],x+12,ky+47,kpiW-24,21,700,'#0B1E3F');
     });
     y+=alturaKPI;
     g.fillStyle='#0B1E3F'; g.font='11.5px Arial,Helvetica,sans-serif';
@@ -2095,15 +2140,15 @@ async function painelParaJPEG(){
     y+=alturaResumo-16;
     for(const L of linhas){
       L.par.forEach((p,i)=>{
-        const x=pad+i*(L.lw+pad), h=p.h*L.lw/p.w;
+        const x=pad+i*(L.lw+gap), h=(L.lw-24)*p.h/p.w;
         g.fillStyle='#fff'; g.fillRect(x,y,L.lw,L.alt);
-        g.fillStyle='#0B1E3F'; g.font='700 12.5px Arial,Helvetica,sans-serif';
-        g.fillText(p.tit,x+12,y+20);
-        g.drawImage(p.img,x+6,y+26,L.lw-12,h*(L.lw-12)/L.lw);
+        canvasTextoAjustado(g,p.tit,x+14,y+23,L.lw-28,15,700);
+        if(p.sub) canvasTextoQuebrado(g,p.sub,x+14,y+43,L.lw-28,14,2,10.5);
+        g.drawImage(p.img,x+12,y+68,L.lw-24,h);
         if(p.leg){ g.fillStyle='#8A9BA9'; g.font='10px Arial,Helvetica,sans-serif';
-          g.fillText(p.leg.replace(/\n/g,' · ').slice(0,110),x+12,y+30+h); }
+          canvasTextoQuebrado(g,p.leg.replace(/\n/g,' · '),x+14,y+82+h,L.lw-28,13,2,10,'#637789'); }
       });
-      y+=L.alt+14;
+      y+=L.alt+gap;
     }
     g.fillStyle='#8A9BA9'; g.font='10.5px Arial,Helvetica,sans-serif';
     g.fillText('Gerado em '+new Date().toLocaleString('pt-BR')+' · tempo de guarda = confirmação menos criação da OT · OTs em aberto ficam fora das médias',pad,H-12);
