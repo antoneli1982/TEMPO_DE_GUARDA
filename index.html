@@ -376,6 +376,10 @@ tr.total>td.k{background:var(--navy);color:#fff}
   .brand span{display:none}
 }
 @media print{
+  body{background:#fff!important}
+  .card{break-inside:avoid}
+  .charts .ch{margin-bottom:16px}
+
   .side,.top-actions,.tbar .btn,.cubeacts{display:none}
   .tscroll{max-height:none}
 }
@@ -411,6 +415,7 @@ tr.total>td.k{background:var(--navy);color:#fff}
         <div class="sep"></div>
         <button data-x="pivot-csv">Tabela dinâmica · CSV</button>
         <button data-x="painel-jpg">Painel completo · imagem JPEG</button>
+        <button data-x="painel-seletor">Selecionar itens para impressão</button>
         <small>O Excel sai com duas abas: os dados e os parâmetros do recorte.</small>
       </div>
     </div>
@@ -1310,10 +1315,7 @@ const METRICAS = [
   {id:'ots',    lbl:'OTs',                cur:'int', f:a=>a.n,                        dica:'Contagem de ordens de transporte no grupo, uma por linha do extrato.'},
   {id:'tmed',   lbl:'Tempo médio',        cur:'dur', f:a=>a.c>0?a.s/a.c:null,         bar:true, sla:true, dica:'Média do tempo entre criar e confirmar a OT. É o indicador principal.'},
   {id:'pctSLA', lbl:'% acima da meta',    cur:'pct', f:a=>a.c>0?100*a.fora/a.c:null,  pill:true, dica:'Percentual de OTs que passaram da meta de tempo definida na barra lateral.'},
-  {id:'naoConf',lbl:'Em aberto',          cur:'int', f:a=>a.ab||null,                 dica:'OTs criadas e ainda não confirmadas. Não entram no cálculo do tempo.'},
-  {id:'qtd',    lbl:'Quantidade',         cur:'int', f:a=>a.q,                        dica:'Soma das peças de todas as OTs do grupo, confirmadas ou não.'},
-  {id:'qtdG',   lbl:'Quantidade guardada',cur:'int', f:a=>a.qc,                       dica:'Soma das peças apenas das OTs já confirmadas.'},
-  {id:'tmed50', lbl:'Metade até',         cur:'dur', f:a=>quantil(a.hist,.5), sla:true,dica:'Metade das OTs foi confirmada em até esse tempo (mediana).'},
+        {id:'tmed50', lbl:'Metade até',         cur:'dur', f:a=>quantil(a.hist,.5), sla:true,dica:'Metade das OTs foi confirmada em até esse tempo (mediana).'},
   {id:'p90',    lbl:'90% até',            cur:'dur', f:a=>quantil(a.hist,.9),         dica:'90% das OTs foram confirmadas em até esse tempo. Mostra o pior cenário comum.'},
   {id:'p95',    lbl:'95% até',            cur:'dur', f:a=>quantil(a.hist,.95),        dica:'95% das OTs foram confirmadas em até esse tempo.'},
   {id:'tmax',   lbl:'Pior caso',          cur:'dur', f:a=>a.mx||null,                 dica:'A OT mais demorada do grupo.'},
@@ -1935,8 +1937,30 @@ function recorteTexto(){
 }
 
 /* ---------- um gráfico ---------- */
+
+// Exportação preparada para impressão: inclui valores visíveis nos gráficos
+function prepararGraficoParaExportacao(svg){
+  const clone = svg.cloneNode(true);
+  clone.querySelectorAll('.bar').forEach(el=>{
+    const tip = el.getAttribute('data-tip') || '';
+    const valor = tip.replace(/<[^>]*>/g,' ').replace(/\\s+/g,' ').trim();
+    if(valor){
+      const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+      const x = parseFloat(el.getAttribute('x')||0) + parseFloat(el.getAttribute('width')||0)/2;
+      const y = parseFloat(el.getAttribute('y')||0) - 5;
+      t.setAttribute('x',x);
+      t.setAttribute('y',y);
+      t.setAttribute('text-anchor','middle');
+      t.setAttribute('class','axis-b');
+      t.textContent = valor.slice(0,22);
+      clone.appendChild(t);
+    }
+  });
+  return clone;
+}
+
 async function graficoParaJPEG(sel, card){
-  const svg=$(sel).querySelector('svg');
+  const svg=prepararGraficoParaExportacao($(sel).querySelector('svg'));
   if(!svg){ toast('Este gráfico está sem dados para exportar.'); return; }
   ocupado('Gerando a imagem…');
   try{
@@ -2326,20 +2350,7 @@ function renderKPIs(rows){
     ...(ST.colHU? [['HUs no recorte', nf0.format(hus), '', nf0.format(husG)+' já guardadas'+(hus?' · '+nf1.format(a.n/hus)+' OTs por HU':''), '',
      'Quantas HUs diferentes aparecem na coluna <b>'+esc(ST.colHU)+'</b> dentro do recorte.<br><br>'+
      'A mesma HU repetida em várias linhas conta uma vez só.']] : []),
-    ['OTs em aberto', nf0.format(a.ab), '', ST.maisAntiga?'a mais antiga é de '+new Date(ST.maisAntiga).toLocaleDateString('pt-BR'):'nenhuma pendência', a.ab>0?'warn':'',
-     'OTs que foram criadas mas ainda não têm data e hora de confirmação.<br><br>'+
-     'Elas não entram em nenhum cálculo de tempo, porque ainda não terminaram.'],
-    ['Quantidade guardada', nf0.format(a.qc), '', a.dc?nf1.format(100*a.d0/a.dc)+'% no mesmo dia da entrada':'apenas OTs confirmadas', '',
-     'Soma da coluna '+colQtd+', somando só as linhas de OTs já confirmadas, dentro do período e dos filtros.<br><br>'+
-     'São peças, não OTs. O número de OTs está no card "OTs no recorte".<br><br>'+
-     (a.dc? 'O texto abaixo é outra conta: entre as OTs que têm data de entrada da mercadoria, '+
-            nf1.format(100*a.d0/a.dc)+'% foram guardadas no mesmo dia em que a mercadoria entrou ('+
-            nf0.format(a.d0)+' de '+nf0.format(a.dc)+').' : '')],
-    ['Quantidade total', nf0.format(a.q), '', 'no recorte · '+nf0.format(ST.qtdBase)+' na base inteira'+(ST.mapa&&ST.mapa.qtd?'':' (coluna não mapeada: 1 por OT)'), '',
-     'Mesma soma da coluna '+colQtd+', mas sem separar por situação: entram as OTs confirmadas e também as em aberto.<br><br>'+
-     'A diferença para a quantidade guardada é o que ainda está pendente.<br><br>'+
-     'Na base inteira, ignorando período e filtros, a soma é '+nf0.format(ST.qtdBase)+'.']
-  ];
+              ];
   $('#kpis').innerHTML=cards.map(c=>
     '<div class="kpi '+(c[4]||'')+'"'+(c[5]?' data-tip="'+('<b>'+esc(c[0])+'</b><br><br>'+c[5]).replace(/"/g,'&quot;')+'"':'')+
     '><div class="eyebrow">'+esc(c[0])+(c[5]?'<span class="kpi-i">?</span>':'')+'</div><div class="v">'+c[1]+
@@ -2968,6 +2979,19 @@ async function exportarDetalheXLSX(){
   ocupado('');
 }
 
+
+function selecionarImpressao(){
+  const itens=[...document.querySelectorAll('.ch')].map(c=>c.querySelector('h3')?.textContent).filter(Boolean);
+  const escolha=prompt('Digite os gráficos para imprimir separados por vírgula:\n\n'+itens.join('\n'));
+  if(!escolha) return;
+  const nomes=escolha.split(',').map(x=>x.trim().toLowerCase());
+  document.querySelectorAll('.ch').forEach(c=>{
+    const nome=(c.querySelector('h3')?.textContent||'').toLowerCase();
+    c.style.display=nomes.some(n=>nome.includes(n))?'':'none';
+  });
+  toast('Seleção aplicada para impressão.');
+}
+
 /* ============================================================
    16. MODAL DE COLUNAS
    ============================================================ */
@@ -3136,6 +3160,7 @@ $('#expMenu').onclick=e=>{
   if(b.dataset.x==='pivot-xlsx') exportarPivotXLSX();
   else if(b.dataset.x==='det-xlsx') exportarDetalheXLSX();
   else if(b.dataset.x==='painel-jpg') painelParaJPEG();
+  else if(b.dataset.x==='painel-seletor') selecionarImpressao();
   else exportar();
 };
 $('#dimAll').onclick=()=>{ ST.dims=dimensoes().map(d=>d.id); aplicarGrupos(); };
