@@ -221,6 +221,9 @@ svg text{font-family:var(--font)}
 .axis-p{fill:var(--muted);font-size:10.5px}
 .bar{transition:opacity .12s}
 .bar:hover{opacity:.78}
+.bar,[data-report]{cursor:pointer}
+.chart-value{fill:var(--navy);font-size:10.5px;font-weight:700;paint-order:stroke;stroke:#fff;stroke-width:3px;stroke-linejoin:round;pointer-events:none}
+.report-hint{font-size:10.5px;color:var(--muted);padding:0 14px 8px;text-align:right}
 .empty{padding:26px 14px;color:var(--muted);font-size:12.5px;text-align:center}
 
 /* ---------------- TABELA ---------------- */
@@ -382,6 +385,8 @@ tr.total>td.k{background:var(--navy);color:#fff}
 
   .side,.top-actions,.tbar .btn,.cubeacts{display:none}
   .tscroll{max-height:none}
+  .chart-value{display:block!important;fill:#0B1E3F!important;stroke:#fff!important}
+  .report-hint,.cardjpg,.cardmenu{display:none!important}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -1854,6 +1859,10 @@ function montarMenusGraficos(){
   document.querySelectorAll('.ch').forEach(card=>{
     const plot=card.querySelector('.plot'); if(!plot||card.querySelector('.cardmenu')) return;
     const id='#'+plot.id;
+    if(!card.querySelector('.report-hint')){
+      const dica=el('div','report-hint','Clique em qualquer parte do gráfico para gerar um relatório individual');
+      card.appendChild(dica);
+    }
     const bj=el('button','cardjpg','⬇ JPEG');
     bj.title='Baixar este gráfico em JPEG';
     bj.onclick=e=>{ e.stopPropagation(); graficoParaJPEG(id, card); };
@@ -1879,6 +1888,32 @@ function montarMenusGraficos(){
     };
   });
 }
+
+function textoRelatorio(html){
+  const d=document.createElement('div'); d.innerHTML=html||'';
+  return d.textContent.replace(/\s+/g,' ').trim();
+}
+function abrirRelatorioUnico(alvo){
+  const card=alvo.closest('.ch')||alvo.closest('.kpi');
+  if(!card) return;
+  const titulo=card.querySelector('h3')?.textContent||card.querySelector('.eyebrow')?.textContent||'Relatório individual';
+  const detalhe=textoRelatorio(alvo.getAttribute('data-report')||alvo.getAttribute('data-tip')||card.getAttribute('data-tip')||'');
+  const svg=card.querySelector('svg');
+  const grafico=svg?svg.outerHTML:'';
+  const janela=window.open('','_blank','width=1000,height=760');
+  if(!janela){ toast('Autorize a abertura de janelas para gerar o relatório.'); return; }
+  janela.document.write('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>'+esc(titulo)+'</title><style>'+ 
+    'body{font-family:Poppins,Arial,sans-serif;color:#0B1E3F;margin:28px}header{border-bottom:4px solid #3A66F5;padding-bottom:14px;margin-bottom:22px}h1{font-size:24px;margin:0 0 6px}.sub{color:#637789;font-size:13px}.box{border:1px solid #DDE3E8;border-radius:10px;padding:18px;margin:18px 0;font-size:18px;font-weight:650}.chart{border:1px solid #DDE3E8;border-radius:10px;padding:14px}.chart svg{width:100%;height:auto}.foot{margin-top:22px;font-size:11px;color:#7C8B99}@media print{body{margin:12mm}.acoes{display:none}}'+
+    '</style></head><body><header><h1>'+esc(titulo)+'</h1><div class="sub">'+esc(recorteTexto())+'</div></header><div class="box">'+esc(detalhe||'Resumo completo do indicador selecionado')+'</div>'+
+    (grafico?'<div class="chart">'+grafico+'</div>':'')+'<div class="foot">Gerado em '+new Date().toLocaleString('pt-BR')+'</div><p class="acoes"><button onclick="window.print()">Imprimir relatório</button></p></body></html>');
+  janela.document.close(); janela.focus();
+}
+
+document.addEventListener('click',e=>{
+  const alvo=e.target.closest&&e.target.closest('.plot [data-tip],.plot .bar,.kpi');
+  if(!alvo) return;
+  abrirRelatorioUnico(alvo);
+});
 
 /* ---------- SVG -> imagem ---------- */
 function svgParaImagem(svg){
@@ -2415,6 +2450,7 @@ function gCombo(id,cats,barras,linhas){
   cats.forEach((c,i)=>{
     const cx=pl+cw*i+cw/2, bh=ih*barras[i]/ymax;
     s+='<rect class="bar" x="'+(cx-bw/2)+'" y="'+(pt+ih-bh)+'" width="'+bw+'" height="'+Math.max(0,bh)+'" rx="2" fill="'+E.cores[0]+'" data-tip="'+esc(c)+'<br><b>'+nf0.format(barras[i])+'</b> OTs"/>';
+    s+='<text class="chart-value" x="'+cx+'" y="'+Math.max(pt+11,pt+ih-bh-5)+'" text-anchor="middle">'+nf0.format(barras[i])+'</text>';
     if(cats.length<=14||i%Math.ceil(cats.length/14)===0)
       s+='<text class="axis" x="'+cx+'" y="'+(h-11)+'" text-anchor="middle">'+esc(String(c).replace(/^\d{2}/,''))+'</text>';
   });
@@ -2425,6 +2461,7 @@ function gCombo(id,cats,barras,linhas){
       const x=pl+cw*i+cw/2, y=pt+ih-ih*Math.min(L.v[i],lmax)/lmax;
       d+=(d?'L':'M')+x+' '+y+' ';
       pts+='<circle cx="'+x+'" cy="'+y+'" r="3.2" fill="#fff" stroke="'+L.c+'" stroke-width="2" data-tip="'+esc(c)+'<br>'+esc(L.k)+' <b>'+dur(L.v[i])+'</b>"/>';
+      pts+='<text class="chart-value" x="'+x+'" y="'+Math.max(pt+10,y-8)+'" text-anchor="middle">'+dur(L.v[i])+'</text>';
     });
     s+='<path d="'+d+'" fill="none" stroke="'+L.c+'" stroke-width="2" stroke-linejoin="round"'+(L.tracejada?' stroke-dasharray="4 3"':'')+'/>'+pts;
   }
@@ -2507,6 +2544,7 @@ function gScatter(id,pts){
     const rr=4+7*Math.sqrt(p.r/rmax);
     s+='<circle cx="'+X(p.x)+'" cy="'+Y(p.y)+'" r="'+rr+'" fill="'+(E.semaforo?(p.y>ST.sla&&p.x>=medX?'var(--red)':p.y>ST.sla?'var(--amber)':'var(--blue)'):E.unica)+
        '" fill-opacity=".6" stroke="#fff" data-tip="<b>'+esc(p.k)+'</b><br>'+nf0.format(p.x)+' OTs<br>Tempo médio '+dur(p.y)+'<br>Qtd '+nf0.format(p.r)+'"/>';
+    if(pts.length<=18) s+='<text class="chart-value" x="'+X(p.x)+'" y="'+Math.max(pt+10,Y(p.y)-rr-4)+'" text-anchor="middle">'+dur(p.y)+'</text>';
   }
   s+='<text class="axis" x="'+(w-pr)+'" y="'+(pt+11)+'" text-anchor="end" fill="var(--red)">muitas OTs + acima do SLA = prioridade</text>'+
      '<text class="axis" x="'+(pl+iw/2)+'" y="'+(h-3)+'" text-anchor="middle">OTs confirmadas no período</text>';
@@ -2532,6 +2570,7 @@ function gHeat(id,grade,cont){
       const v=grade[d][x];
       s+='<rect x="'+(lw+cw*x)+'" y="'+y+'" width="'+(cw-2)+'" height="'+(ch-3)+'" rx="3" fill="'+(v==null?'#F0F4F7':cor(v))+
          '"'+(v==null?'':' data-tip="'+DSEM[d]+' · '+String(x).padStart(2,'0')+'h<br>Tempo médio <b>'+dur(v)+'</b><br>'+nf0.format(cont[d][x])+' OTs"')+'/>';
+      if(v!=null&&cw>=31) s+='<text class="chart-value" x="'+(lw+cw*x+(cw-2)/2)+'" y="'+(y+ch/2+3)+'" text-anchor="middle">'+nf0.format(cont[d][x])+'</text>';
     }
   }
   const ly=18+7*ch+12, lwid=150;
@@ -2617,6 +2656,8 @@ function gDiario(id,dias){
       const bh=ih*v/ymax; base-=bh;
       s+='<rect class="bar" x="'+x+'" y="'+base+'" width="'+bw+'" height="'+Math.max(.8,bh)+'" fill="'+cor+'"/>';
     }
+    if(d.n>0&&(dias.length<=35||D%Math.ceil(dias.length/35)===0))
+      s+='<text class="chart-value" x="'+cx+'" y="'+Math.max(pt+10,Y(d.n)-5)+'" text-anchor="middle">'+nf0.format(d.n)+'</text>';
   });
 
   /* linha do tempo médio */
@@ -2626,6 +2667,7 @@ function gDiario(id,dias){
     const x=pl+cw*i+cw/2, y=YL(tempos[i]);
     dP+=(dP?'L':'M')+x+' '+y+' ';
     if(dias.length<=45) pts+='<circle cx="'+x+'" cy="'+y+'" r="3" fill="#fff" stroke="'+corL+'" stroke-width="2"/>';
+    if(dias.length<=24) pts+='<text class="chart-value" x="'+x+'" y="'+Math.max(pt+10,y-8)+'" text-anchor="middle">'+dur(tempos[i])+'</text>';
   });
   s+='<path d="'+dP+'" fill="none" stroke="'+corL+'" stroke-width="2" stroke-linejoin="round"/>'+pts;
 
