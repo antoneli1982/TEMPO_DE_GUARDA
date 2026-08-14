@@ -86,6 +86,18 @@ button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit
 .btn.mini{padding:4px 9px;font-size:11.5px;border-color:var(--line);color:var(--slate);background:#fff}
 .btn.mini:hover{border-color:var(--blue);color:var(--blue)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.danger{border-color:rgba(255,255,255,.4);color:#FFD9D4}
+.btn.danger:hover{background:var(--red);border-color:var(--red);color:#fff}
+.btn.danger.solid{background:var(--red);border-color:var(--red);color:#fff}
+.btn.danger.solid:hover{filter:brightness(1.08)}
+.senha-wrap{position:relative;max-width:220px;margin:14px 0 4px}
+.senha-wrap input{
+  width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid var(--line);border-radius:var(--r);
+  font-size:15px;letter-spacing:.12em;font-weight:600;color:var(--navy)
+}
+.senha-wrap input:focus{outline:none;border-color:var(--blue)}
+.senha-erro{color:var(--red);font-size:12px;font-weight:600;margin-top:7px;display:none}
+.senha-erro.on{display:block}
 #burger{display:inline-flex}
 .syncbox{
   display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.28);
@@ -441,6 +453,8 @@ tr.total>td.k{background:var(--navy);color:#fff}
         <small>O Excel sai com duas abas: os dados e os parâmetros do recorte.</small>
       </div>
     </div>
+    <span class="sep-v"></span>
+    <button class="btn danger solid" id="btnLimparMem" title="Apaga a base compartilhada para todos os navegadores">Limpar memória</button>
   </div>
 </header>
 
@@ -586,6 +600,31 @@ tr.total>td.k{background:var(--navy);color:#fff}
         inteiro para cima. Quando a média estiver muito acima da coluna <b>Metade até</b>,
         o problema costuma ser um punhado de OTs paradas, não o ritmo do time.
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="limparModal">
+  <div class="sheet" style="max-width:420px">
+    <div class="sheet-h">
+      <h2>Limpar memória compartilhada</h2>
+      <span class="sp" style="flex:1"></span>
+      <button class="btn mini" id="limparClose">Fechar</button>
+    </div>
+    <div class="sheet-b">
+      <div class="note" style="border-color:var(--red);background:#FBEAE8;color:#7A2A22">
+        <b>Atenção.</b> Isso apaga a base compartilhada do Firebase para todos os navegadores conectados.
+        Cada um voltará a ver a tela de "Carregue o extrato" até que alguém envie uma planilha nova.
+        Essa ação não pode ser desfeita.
+      </div>
+      <div class="senha-wrap" style="margin-top:14px">
+        <input type="password" id="senhaLimpar" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••••" />
+      </div>
+      <div class="senha-erro" id="senhaErro">Senha incorreta. Confira a data de hoje.</div>
+    </div>
+    <div class="sheet-f">
+      <button class="btn mini" id="limparCancelar">Cancelar</button>
+      <button class="btn danger solid" id="limparConfirmar">Apagar base compartilhada</button>
     </div>
   </div>
 </div>
@@ -1156,6 +1195,27 @@ const FB = {
       return false;
     }finally{
       this.publicando=false; ocupado('');
+    }
+  },
+
+  async limpar(){
+    if(!this.pronto||!this.dbSdk||!this.db){
+      toast('Sem conexão com o banco compartilhado no momento. Tente novamente em instantes.');
+      return false;
+    }
+    ocupado('Apagando a base compartilhada…');
+    try{
+      await this.dbSdk.remove(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/current'));
+      await this.dbSdk.remove(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/bases'));
+      this.versao=null; this.assinatura=null; this.ultimaMeta=null; this.pendente=null; this.mapaPendente=null;
+      toast('Memória compartilhada apagada. Todos os navegadores voltarão à tela inicial.');
+      return true;
+    }catch(e){
+      this.falha(e);
+      toast('Não foi possível apagar a base compartilhada.');
+      return false;
+    }finally{
+      ocupado('');
     }
   },
 
@@ -3284,6 +3344,43 @@ document.querySelectorAll('.aba').forEach(a=>a.onclick=()=>mostrarPagina(a.datas
 $('#btnGuia').onclick=()=>$('#guia').classList.add('on');
 $('#guiaClose').onclick=()=>$('#guia').classList.remove('on');
 $('#guia').onclick=e=>{ if(e.target.id==='guia') $('#guia').classList.remove('on'); };
+
+function senhaDeHoje(){
+  const d=new Date();
+  const dd=String(d.getDate()).padStart(2,'0');
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  const aa=String(d.getFullYear()%100).padStart(2,'0');
+  return dd+mm+aa;
+}
+function fecharLimparModal(){
+  $('#limparModal').classList.remove('on');
+  $('#senhaLimpar').value='';
+  $('#senhaErro').classList.remove('on');
+}
+$('#btnLimparMem').onclick=()=>{
+  $('#limparModal').classList.add('on');
+  $('#senhaErro').classList.remove('on');
+  $('#senhaLimpar').value='';
+  setTimeout(()=>$('#senhaLimpar').focus(),50);
+};
+$('#limparClose').onclick=fecharLimparModal;
+$('#limparCancelar').onclick=fecharLimparModal;
+$('#limparModal').onclick=e=>{ if(e.target.id==='limparModal') fecharLimparModal(); };
+async function confirmarLimparMemoria(){
+  const digitada=$('#senhaLimpar').value.trim();
+  if(digitada!==senhaDeHoje()){
+    $('#senhaErro').classList.add('on');
+    $('#senhaLimpar').value='';
+    $('#senhaLimpar').focus();
+    return;
+  }
+  $('#senhaErro').classList.remove('on');
+  const ok=await FB.limpar();
+  fecharLimparModal();
+  if(ok) setTimeout(()=>location.reload(),900);
+}
+$('#limparConfirmar').onclick=confirmarLimparMemoria;
+$('#senhaLimpar').onkeydown=e=>{ if(e.key==='Enter') confirmarLimparMemoria(); };
 window.addEventListener('resize',debounce(()=>{ if(ST.rows.length&&ST.ver.graficos) renderGraficos(filtradas()); },250));
 
 const TIP=$('#tip');
@@ -3297,7 +3394,7 @@ document.addEventListener('mousemove',e=>{
   if(top<8) top=Math.min(window.innerHeight-th-8, e.clientY+18);   // não coube acima: vai para baixo
   TIP.style.top=Math.max(8,top)+'px';
 });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ $('#modal').classList.remove('on'); $('#guia').classList.remove('on'); } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ $('#modal').classList.remove('on'); $('#guia').classList.remove('on'); fecharLimparModal(); } });
 renderFiltros();
 $('#logoTopo').src=LOGO_B64;
 
