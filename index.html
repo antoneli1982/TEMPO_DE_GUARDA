@@ -1094,6 +1094,29 @@ const FIREBASE_CONFIG = {
 };
 const FIREBASE_RAIZ = 'tempoDeGuarda/compartilhado';
 const FIREBASE_PARTE_BYTES = 550 * 1024;
+/* ============================================================
+   COMPACTAÇÃO FIREBASE
+   A base operacional possui muita repetição (material, prédio,
+   tipos etc.). Guardamos um dicionário de textos e referências
+   numéricas para reduzir drasticamente o consumo do RTDB.
+   ============================================================ */
+function compactarLinhasFirebase(linhas){
+  const dict=[], mapa=new Map();
+  const idx=v=>{
+    const s=String(v==null?'':v);
+    let i=mapa.get(s);
+    if(i===undefined){ i=dict.length; dict.push(s); mapa.set(s,i); }
+    return i;
+  };
+  return {
+    dict,
+    linhas:linhas.map(l=>listaFirebase(l).map(idx))
+  };
+}
+function descompactarLinhasFirebase(linhas,dict){
+  return listaFirebase(linhas).map(l=>listaFirebase(l).map(i=>dict[Number(i)]??''));
+}
+
 
 function statusSync(tipo,texto,detalhe){
   const box=$('#syncBox'), txt=$('#syncTxt');
@@ -1233,7 +1256,12 @@ const FB = {
         if(token!==this.cargaSeq) return;
         for(const snap of snaps){
           const parte=listaFirebase(snap.val());
-          for(const raw of parte) linhas.push(linhaFirebase(raw));
+          if(meta.compact && meta.dict){
+            const dec=descompactarLinhasFirebase(parte,meta.dict);
+            for(const raw of dec) linhas.push(raw);
+          } else {
+            for(const raw of parte) linhas.push(linhaFirebase(raw));
+          }
         }
         ocupado('Baixando a base compartilhada… '+Math.min(fim,total)+' de '+total);
       }
@@ -1269,6 +1297,7 @@ const FB = {
       versao='v'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
       const headerLimpo=listaFirebase(header).map(v=>String(v==null?'':v));
       const mapaLimpo=mapaFirebase(mapa,headerLimpo);
+      const compactado=compactarLinhasFirebase(linhas);
       let indice=0, concluidas=0, grupo=[];
 
       const esperarGrupo=async()=>{
@@ -1278,7 +1307,7 @@ const FB = {
       };
 
       ocupado('Preparando a sincronização…');
-      for(const parte of partesFirebase(linhas)){
+      for(const parte of partesFirebase(compactado.linhas)){
         const i=indice++, chave=String(i).padStart(6,'0');
         const tarefa=this.dbSdk.set(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/bases/'+versao+'/chunks/'+chave),parte)
           .then(()=>{
@@ -1296,7 +1325,8 @@ const FB = {
       const meta={
         schema:2, version:versao, nome:String(nome||'Base compartilhada'),
         header:headerLimpo, mapa:mapaLimpo, chunkCount:indice,
-        rowCount:linhas.length, savedAt:agora, mapUpdatedAt:agora
+        rowCount:linhas.length, savedAt:agora, mapUpdatedAt:agora,
+        compact:true, dict:compactado.dict
       };
       if(metaAnterior.version) meta.previousVersion=metaAnterior.version;
       const assinatura=versao+'|'+agora;
