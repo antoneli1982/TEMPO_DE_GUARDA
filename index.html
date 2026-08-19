@@ -223,8 +223,9 @@ button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit
 .ch.c6{grid-column:span 6}.ch.c12{grid-column:span 12}
 .ch.c4{grid-column:span 4}.ch.c8{grid-column:span 8}
 .ch.c5{grid-column:span 5}.ch.c7{grid-column:span 7}
-.plot{padding:4px 8px 0;max-width:100%;overflow-x:hidden}
+.plot{padding:4px 8px 0;max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:thin}
 .plot svg{display:block;width:100%;height:auto;max-width:100%}
+.plot svg.chart-scroll{max-width:none}
 .legend{display:flex;gap:12px;flex-wrap:wrap;padding:2px 14px 8px;font-size:12.5px;color:var(--slate)}
 .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 svg text{font-family:var(--font)}
@@ -2853,11 +2854,33 @@ function ticks(max,n){
   for(let v=0;v<=topo+1e-9;v+=passo) arr.push(+v.toFixed(6));
   return arr;
 }
-const svgAbre=(w,h)=>'<svg viewBox="0 0 '+w+' '+h+'" width="100%" height="'+h+'" preserveAspectRatio="xMidYMid meet">';
+const svgAbre=(w,h,rolar=false)=>'<svg'+(rolar?' class="chart-scroll" style="min-width:'+w+'px"':'')+' viewBox="0 0 '+w+' '+h+'" width="100%" height="'+h+'" preserveAspectRatio="xMidYMid meet">';
 const vazio=m=>'<div class="empty">'+esc(m)+'</div>';
 const corSLA=v=>v>ST.sla?'var(--red)':v>ST.sla*.75?'var(--amber)':'var(--green)';
 const corta=(s,n)=>{ s=String(s); return s.length>n?s.slice(0,n-1)+'…':s; };
 function mediana(arr){ if(!arr.length)return 0; const a=[...arr].sort((x,y)=>x-y); const m=a.length>>1; return a.length%2?a[m]:(a[m-1]+a[m])/2; }
+
+/* Evita que valores de barras e linhas ocupem o mesmo espaço visual. */
+function ajustarRotulosGrafico(container){
+  const svg=container&&container.querySelector('svg');
+  if(!svg) return;
+  const vb=svg.viewBox.baseVal, usados=[];
+  for(const el of svg.querySelectorAll('.chart-value')){
+    const y0=Number(el.getAttribute('y'));
+    if(!Number.isFinite(y0)) continue;
+    let escolhido=null;
+    for(const dy of [0,-15,15,-30,30]){
+      el.setAttribute('y',String(y0+dy));
+      let b; try{ b=el.getBBox(); }catch(_){ b=null; }
+      if(!b) break;
+      const dentro=b.y>=3&&b.y+b.height<=vb.height-5;
+      const livre=!usados.some(o=>b.x<o.x+o.width+3&&b.x+b.width+3>o.x&&b.y<o.y+o.height+3&&b.y+b.height+3>o.y);
+      if(dentro&&livre){ escolhido=b; break; }
+    }
+    if(!escolhido){ el.setAttribute('y',String(y0)); try{ escolhido=el.getBBox(); }catch(_){} }
+    if(escolhido) usados.push(escolhido);
+  }
+}
 
 /* barras horizontais pela média */
 function gBarras(id,itens){
@@ -2885,12 +2908,12 @@ function gBarras(id,itens){
 /* colunas (volume) + linha (tempo médio) */
 function gCombo(id,cats,barras,linhas){
   const E=esq(id.slice(1)), n=$(id); if(!cats.length){ n.innerHTML=vazio('Sem OTs no recorte.'); return; }
-  const w=larg(id), h=w>820?312:252, pl=54, pr=58, pt=14, pb=32, iw=w-pl-pr, ih=h-pt-pb;
+  const baseW=larg(id), w=Math.max(baseW,Math.min(1200,112+cats.length*70)), h=w>820?312:252, pl=54, pr=58, pt=14, pb=32, iw=w-pl-pr, ih=h-pt-pb;
   const ys=ticks(Math.max(1,...barras),4), ymax=ys[ys.length-1];
   const todos=linhas.flatMap(l=>l.v).filter(v=>v!=null);
   const ls=ticks(Math.max(1,...todos),4), lmax=ls[ls.length-1];
   const cw=iw/cats.length, bw=Math.min(46,cw*.5);
-  let s=svgAbre(w,h);
+  let s=svgAbre(w,h,w>baseW);
   ys.forEach(t=>{ const y=pt+ih-ih*t/ymax;
     s+='<line class="gridline" x1="'+pl+'" y1="'+y+'" x2="'+(w-pr)+'" y2="'+y+'"/>'+
        '<text class="axis" x="'+(pl-7)+'" y="'+(y+3.5)+'" text-anchor="end">'+nf0.format(t)+'</text>'; });
@@ -2916,14 +2939,15 @@ function gCombo(id,cats,barras,linhas){
   }
   n.innerHTML=s+'</svg><div class="legend"><span><i style="background:'+E.cores[0]+'"></i>OTs</span>'+
     linhas.map(L=>'<span><i style="background:'+L.c+'"></i>'+esc(L.k)+' (eixo direito)</span>').join('')+'</div>';
+  ajustarRotulosGrafico(n);
 }
 
 function gFaixas(id,vals){
   const E=esq(id.slice(1)), n=$(id), tot=vals.reduce((a,b)=>a+b,0);
   if(!tot){ n.innerHTML=vazio('Sem OTs confirmadas no recorte.'); return; }
-  const w=larg(id), h=w>820?300:236, pl=50, pr=52, pt=16, pb=44, iw=w-pl-pr, ih=h-pt-pb;
+  const baseW=larg(id), w=Math.max(baseW,640), h=w>820?300:236, pl=50, pr=52, pt=16, pb=44, iw=w-pl-pr, ih=h-pt-pb;
   const ys=ticks(Math.max(...vals),4), ymax=ys[ys.length-1], cw=iw/vals.length;
-  let s=svgAbre(w,h), acc=0, d='';
+  let s=svgAbre(w,h,w>baseW), acc=0, d='';
   ys.forEach(t=>{ const y=pt+ih-ih*t/ymax;
     s+='<line class="gridline" x1="'+pl+'" y1="'+y+'" x2="'+(w-pr)+'" y2="'+y+'"/>'+
        '<text class="axis" x="'+(pl-7)+'" y="'+(y+3.5)+'" text-anchor="end">'+nf0.format(t)+'</text>'; });
@@ -2945,10 +2969,10 @@ function gFaixas(id,vals){
 
 function gDonut(id,itens){
   const n=$(id); if(!itens.length){ n.innerHTML=vazio('Sem OTs no recorte.'); return; }
-  const w=larg(id), h=Math.max(236,86+itens.length*26), cx=Math.min(150,Math.max(118,w*.20)), cy=h/2,
+  const baseW=larg(id), w=Math.max(baseW,680), h=Math.max(246,86+itens.length*26), cx=Math.min(150,Math.max(118,w*.20)), cy=h/2,
         R=Math.min(96,h/2-18), r=R*.6;
   const tot=itens.reduce((s,i)=>s+i.v,0)||1;
-  let a0=-Math.PI/2, s=svgAbre(w,h);
+  let a0=-Math.PI/2, s=svgAbre(w,h,w>baseW);
   itens.forEach(it=>{
     const ang=2*Math.PI*it.v/tot, a1=a0+ang, gr=ang>Math.PI?1:0;
     const p=(rr,a)=>[cx+rr*Math.cos(a),cy+rr*Math.sin(a)];
@@ -2958,8 +2982,8 @@ function gDonut(id,itens){
        nf1.format(100*it.v/tot)+'%<br>tempo médio '+dur(it.t)+'"/>';
     a0=a1;
   });
-  s+='<text x="'+cx+'" y="'+(cy-1)+'" text-anchor="middle" font-size="22" font-weight="700" fill="var(--navy)">'+nf0.format(tot)+'</text>'+
-     '<text x="'+cx+'" y="'+(cy+16)+'" text-anchor="middle" font-size="12" fill="var(--muted)">OTs</text>';
+  s+='<text x="'+cx+'" y="'+(cy-7)+'" text-anchor="middle" font-size="22" font-weight="700" fill="var(--navy)">'+nf0.format(tot)+'</text>'+
+     '<text x="'+cx+'" y="'+(cy+20)+'" text-anchor="middle" font-size="12" fill="var(--muted)">OTs</text>';
   const lx=cx+R+24, rx=Math.min(w-8,lx+470); let ly=cy-itens.length*13;
   itens.forEach(it=>{
     s+='<rect x="'+lx+'" y="'+ly+'" width="11" height="11" rx="2" fill="'+it.c+'"/>'+
@@ -2973,16 +2997,16 @@ function gDonut(id,itens){
 
 function gScatter(id,pts){
   const E=esq(id.slice(1)), n=$(id); if(pts.length<2){ n.innerHTML=vazio('Poucos materiais confirmados para dispersar.'); return; }
-  const w=larg(id), h=w>900?400:300, pl=58, pr=18, pt=16, pb=38, iw=w-pl-pr, ih=h-pt-pb;
+  const baseW=larg(id), w=Math.max(baseW,720), h=w>900?410:320, pl=58, pr=18, pt=16, pb=54, iw=w-pl-pr, ih=h-pt-pb;
   const xs=ticks(Math.max(...pts.map(p=>p.x)),4), ys=ticks(Math.max(...pts.map(p=>p.y)),4);
   const xmax=xs[xs.length-1], ymax=ys[ys.length-1];
   const medX=mediana(pts.map(p=>p.x)), rmax=Math.max(...pts.map(p=>p.r))||1;
   const X=v=>pl+iw*v/xmax, Y=v=>pt+ih-ih*Math.min(v,ymax)/ymax;
-  let s=svgAbre(w,h);
+  let s=svgAbre(w,h,w>baseW);
   ys.forEach(t=>{ s+='<line class="gridline" x1="'+pl+'" y1="'+Y(t)+'" x2="'+(w-pr)+'" y2="'+Y(t)+'"/>'+
     '<text class="axis" x="'+(pl-7)+'" y="'+(Y(t)+3.5)+'" text-anchor="end">'+dur(t)+'</text>'; });
   xs.forEach((t,i)=>{ const an=i===0?'start':i===xs.length-1?'end':'middle';
-    s+='<text class="axis" x="'+X(t)+'" y="'+(h-16)+'" text-anchor="'+an+'">'+nf0.format(t)+'</text>'; });
+    s+='<text class="axis" x="'+X(t)+'" y="'+(h-25)+'" text-anchor="'+an+'">'+nf0.format(t)+'</text>'; });
   if(ST.sla<=ymax){
     s+='<rect x="'+X(medX)+'" y="'+pt+'" width="'+(w-pr-X(medX))+'" height="'+Math.max(0,Y(ST.sla)-pt)+'" fill="var(--red)" opacity=".05"/>'+
        '<line x1="'+pl+'" y1="'+Y(ST.sla)+'" x2="'+(w-pr)+'" y2="'+Y(ST.sla)+'" stroke="var(--navy)" stroke-dasharray="3 3"/>'+
@@ -2996,19 +3020,19 @@ function gScatter(id,pts){
     if(pts.length<=18) s+='<text class="chart-value" x="'+X(p.x)+'" y="'+Math.max(pt+10,Y(p.y)-rr-4)+'" text-anchor="middle">'+dur(p.y)+'</text>';
   }
   s+='<text class="axis" x="'+(w-pr)+'" y="'+(pt+11)+'" text-anchor="end" fill="var(--red)">muitas OTs + acima do SLA = prioridade</text>'+
-     '<text class="axis" x="'+(pl+iw/2)+'" y="'+(h-3)+'" text-anchor="middle">OTs confirmadas no período</text>';
+     '<text class="axis" x="'+(pl+iw/2)+'" y="'+(h-5)+'" text-anchor="middle">OTs confirmadas no período</text>';
   n.innerHTML=s+'</svg>';
 }
 
 /* mapa de calor: dia da semana × hora */
 function gHeat(id,grade,cont){
   const E=esq(id.slice(1)), n=$(id);
-  const w=larg(id), lw=64, cw=(w-lw-30)/24, ch=Math.round(Math.max(22,Math.min(38,cw*.68))), h=18+7*ch+32;
+  const baseW=larg(id), w=Math.max(baseW,920), lw=64, cw=(w-lw-30)/24, ch=Math.round(Math.max(22,Math.min(38,cw*.68))), h=18+7*ch+32;
   let vs=[]; for(let d=0;d<7;d++) for(let x=0;x<24;x++) if(grade[d][x]!=null) vs.push(grade[d][x]);
   if(!vs.length){ n.innerHTML=vazio('Sem OTs confirmadas no recorte.'); return; }
   const max=Math.max(...vs), lim=Math.max(ST.sla*2,max*.9);
   const cor=v=>naRampa(E.rampa,v/lim);
-  let s=svgAbre(w,h);
+  let s=svgAbre(w,h,w>baseW);
   const passo=cw>=34?1:2;
   const clsHora=cw>=30?'axis':'axis-p';
   for(let x=0;x<24;x+=passo) s+='<text class="'+clsHora+'" x="'+(lw+cw*x+cw/2)+'" y="12" text-anchor="middle">'+String(x).padStart(2,'0')+'h</text>';
@@ -3070,7 +3094,7 @@ function serieDiaria(rows){
 function gDiario(id,dias){
   const E=esq(id.slice(1)), n=$(id);
   if(!dias.length){ n.innerHTML=vazio('Sem OTs no recorte.'); return; }
-  const w=larg(id), h=dias.length>60?318:296, pl=52, pr=60, pt=18, pb=46, iw=w-pl-pr, ih=h-pt-pb;
+  const baseW=larg(id), w=Math.max(baseW,Math.min(1800,140+dias.length*46)), h=dias.length>60?330:310, pl=52, pr=82, pt=18, pb=58, iw=w-pl-pr, ih=h-pt-pb;
   const ys=ticks(Math.max(1,...dias.map(d=>d.n)),4), ymax=ys[ys.length-1];
   const tempos=dias.map(d=>d.c?d.s/d.c:null);
   const ls=ticks(Math.max(1,ST.sla,...tempos.filter(v=>v!=null)),4), lmax=ls[ls.length-1];
@@ -3081,7 +3105,7 @@ function gDiario(id,dias){
   const corL = E.linha;
   const Y = v => pt+ih-ih*Math.min(v,ymax)/ymax;
   const YL = v => pt+ih-ih*Math.min(v,lmax)/lmax;
-  let s=svgAbre(w,h);
+  let s=svgAbre(w,h,w>baseW);
 
   /* fundo dos fins de semana */
   dias.forEach((d,i)=>{ if(d.dsem===0||d.dsem===6)
@@ -3093,7 +3117,7 @@ function gDiario(id,dias){
 
   /* meta no eixo da direita */
   if(ST.sla<=lmax) s+='<line x1="'+pl+'" y1="'+YL(ST.sla)+'" x2="'+(w-pr)+'" y2="'+YL(ST.sla)+'" stroke="var(--navy)" stroke-width="1" stroke-dasharray="3 3"/>'+
-    '<text class="axis" x="'+(w-pr-5)+'" y="'+(YL(ST.sla)-5)+'" text-anchor="end" fill="var(--navy)">meta '+dur(ST.sla)+'</text>';
+    '<text class="axis" x="'+(w-pr+7)+'" y="'+(YL(ST.sla)-5)+'" fill="var(--navy)">meta '+dur(ST.sla)+'</text>';
 
   /* colunas empilhadas */
   dias.forEach((d,D)=>{
@@ -3135,7 +3159,7 @@ function gDiario(id,dias){
   /* rótulos do eixo x */
   const passo=Math.max(1,Math.ceil(dias.length/Math.max(4,Math.floor(iw/62))));
   dias.forEach((d,i)=>{ if(i%passo) return;
-    s+='<text class="axis" x="'+(pl+cw*i+cw/2)+'" y="'+(h-24)+'" text-anchor="middle">'+d.rot+'</text>';
+    s+='<text class="axis" x="'+(pl+cw*i+cw/2)+'" y="'+(h-32)+'" text-anchor="middle">'+d.rot+'</text>';
     if(dias.length<=45) s+='<text class="axis-p" x="'+(pl+cw*i+cw/2)+'" y="'+(h-12)+'" text-anchor="middle" opacity=".7">'+DSEM[d.dsem].slice(0,3)+'</text>';
   });
 
@@ -3161,6 +3185,7 @@ function gDiario(id,dias){
     '<span><i style="background:var(--navy)"></i>média móvel de 7 dias</span>'+
     '<span>· média de '+nf1.format(totN/dias.length)+' OTs por dia'+
     (totC?' · '+nf1.format(100*totF/totC)+'% acima da meta no período':'')+'</span></div>';
+  ajustarRotulosGrafico(n);
 }
 
 function renderGrafico1(rows){
