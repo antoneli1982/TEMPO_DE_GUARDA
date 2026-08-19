@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Tempo de Guarda — Analytics de Armazenagem</title>
-<meta name="application-version" content="2026.08.18_persistencia_sla120" />
+<meta name="application-version" content="2026.08.19_firebase_auth_online" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -1161,14 +1161,30 @@ function detalheFirebase(meta){
 }
 
 const FB = {
-  appSdk:null, dbSdk:null, db:null, pronto:false, conectado:false, iniciando:false,
+  appSdk:null, dbSdk:null, authSdk:null, db:null, auth:null,
+  pronto:false, conectado:false, autenticado:false, iniciando:false, erroAuth:null,
   publicando:false, versao:null, assinatura:null, cargaSeq:0, pendente:null, mapaPendente:null,
   metaRecebida:false, carregando:false, ultimaMeta:null,
 
-  iniciar(appSdk,dbSdk){
+  async iniciar(appSdk,dbSdk,authSdk){
     if(this.pronto) return;
-    this.appSdk=appSdk; this.dbSdk=dbSdk;
+    this.appSdk=appSdk; this.dbSdk=dbSdk; this.authSdk=authSdk;
     const app=appSdk.initializeApp(FIREBASE_CONFIG);
+    this.auth=authSdk.getAuth(app);
+    statusSync('busy','Autenticando','Abrindo uma sessão segura no Firebase');
+    try{
+      const credencial=await authSdk.signInAnonymously(this.auth);
+      this.autenticado=!!(credencial&&credencial.user);
+      this.erroAuth=null;
+    }catch(e){
+      this.autenticado=false;
+      this.erroAuth=e;
+      const codigo=String(e&&e.code||'');
+      if(codigo.includes('operation-not-allowed')){
+        throw new Error('Ative o provedor Anônimo em Firebase Authentication > Método de login.');
+      }
+      throw e;
+    }
     this.db=dbSdk.getDatabase(app);
     this.pronto=true; this.iniciando=false;
     statusSync('busy','Conectando','Conectando ao banco compartilhado');
@@ -1200,6 +1216,7 @@ const FB = {
   },
 
   falha(err){
+    this.iniciando=false;
     console.error('Falha na sincronização com o Firebase',err);
     statusSync('error','Falha ao sincronizar',err&&err.message?err.message:'Não foi possível acessar o banco');
   },
@@ -3581,11 +3598,12 @@ async function iniciarFirebase(){
   }
   FB.iniciando=true;
   try{
-    const [appSdk,dbSdk]=await Promise.all([
+    const [appSdk,dbSdk,authSdk]=await Promise.all([
       import('https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js'),
-      import('https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js')
+      import('https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js'),
+      import('https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js')
     ]);
-    FB.iniciar(appSdk,dbSdk);
+    await FB.iniciar(appSdk,dbSdk,authSdk);
   }catch(e){
     FB.iniciando=false;
     FB.falha(e);
