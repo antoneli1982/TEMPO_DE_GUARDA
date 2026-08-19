@@ -1017,7 +1017,7 @@ const ST = {
    Serve como contingência quando a página é atualizada sem conexão.
    ============================================================ */
 const CACHE_LOCAL = {
-  DB:'tempoDeGuardaLocal', STORE:'dados', VERSAO:1, restaurando:false,
+  DB:'tempoDeGuardaLocal', STORE:'dados', VERSAO:1, restaurando:false, salvando:false,
   abrir(){
     return new Promise((resolve,reject)=>{
       if(!('indexedDB' in window)) return reject(new Error('IndexedDB indisponível'));
@@ -1037,8 +1037,9 @@ const CACHE_LOCAL = {
     try{ return await new Promise((resolve,reject)=>{ const tx=db.transaction(this.STORE,'readonly'); const req=tx.objectStore(this.STORE).get(chave); req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error); }); }
     finally{ db.close(); }
   },
-  async salvarBase(header,linhas,nome,mapa){
-    if(this.restaurando||!header?.length||!linhas?.length) return;
+  async salvarBase(header,linhas,nome,mapa,sincronizada=true){
+    if(this.restaurando||!header?.length||!linhas?.length) return false;
+    this.salvando=true;
     try{
       const bruto={header:[...header],linhas,nome:String(nome||'Base local'),salvoEm:Date.now()};
       let pacote=bruto;
@@ -1050,7 +1051,16 @@ const CACHE_LOCAL = {
       }
       await this.set('base',pacote);
       await this.salvarMapa(mapa,header);
-    }catch(e){ console.warn('Não foi possível salvar a cópia local compactada da base',e); }
+      await this.set('estado',{pendente:sincronizada!==true,salvoEm:bruto.salvoEm});
+      return true;
+    }catch(e){
+      console.warn('Não foi possível salvar a cópia local compactada da base',e);
+      return false;
+    }finally{ this.salvando=false; }
+  },
+  async marcarSincronizada(){
+    try{ await this.set('estado',{pendente:false,salvoEm:Date.now()}); }
+    catch(e){ console.warn('Não foi possível atualizar o estado da cópia local',e); }
   },
   async salvarMapa(mapa,header){
     try{ await this.set('mapa',{mapa:mapaFirebase(mapa,header||ST.colunas),salvoEm:Date.now()}); }
@@ -1064,8 +1074,8 @@ const CACHE_LOCAL = {
         const fluxo=new Blob([base.dados]).stream().pipeThrough(new DecompressionStream('gzip'));
         base=JSON.parse(await new Response(fluxo).text());
       }
-      return {base,cfg:await this.get('mapa')};
-    }catch(e){ console.warn('Não foi possível ler a cópia local',e); return {base:null,cfg:null}; }
+      return {base,cfg:await this.get('mapa'),estado:await this.get('estado')};
+    }catch(e){ console.warn('Não foi possível ler a cópia local',e); return {base:null,cfg:null,estado:null}; }
   },
   async limpar(){
     try{
@@ -1103,7 +1113,7 @@ function mapaPreservadoPara(header){
 }
 
 async function restaurarBaseLocal(){
-  const {base,cfg}=await CACHE_LOCAL.carregar();
+  const {base,cfg,estado}=await CACHE_LOCAL.carregar();
   if(!base||!base.header?.length||!base.linhas?.length||ST.rows.length) return false;
   CACHE_LOCAL.restaurando=true;
   try{
@@ -1111,8 +1121,14 @@ async function restaurarBaseLocal(){
     const mapa=(cfg&&cfg.mapa)?mapaFirebase(cfg.mapa,base.header):null;
     const ok=concluir(base.header,base.linhas,(base.nome||'Base local')+' · cópia local',t0,mapa,false);
     if(ok){
-      statusSync('busy','Base local','Última base preservada neste navegador; verificando versão compartilhada');
-      toast('Última base restaurada do navegador enquanto a sincronização é verificada.');
+      if(estado&&estado.pendente){
+        FB.pendente={header:base.header,linhas:base.linhas,nome:base.nome||'Base local',mapa:mapa||autoMap(base.header)};
+        statusSync('busy','Envio pendente','A base foi preservada e será enviada novamente ao Firebase');
+        toast('A atualização pendente foi restaurada e voltará a sincronizar automaticamente.');
+      }else{
+        statusSync('busy','Base local','Última base preservada neste navegador; verificando versão compartilhada');
+        toast('Última base restaurada do navegador enquanto a sincronização é verificada.');
+      }
     }
     return ok;
   }finally{ CACHE_LOCAL.restaurando=false; }
@@ -1310,6 +1326,11 @@ const FB = {
 
   async receber(meta){
     this.metaRecebida=true; this.ultimaMeta=meta;
+    /* A importação local pendente é mais nova que a cópia remota. */
+    if(this.pendente||this.publicando){
+      statusSync('busy',this.publicando?'Sincronizando':'Envio pendente','Preservando a atualização local até o envio terminar');
+      return;
+    }
     if(!meta||!meta.version){
       this.cargaSeq++; this.carregando=false; ocupado('');
       this.versao=null; this.assinatura=null;
@@ -1457,6 +1478,7 @@ const FB = {
       await this.dbSdk.set(atualRef,meta);
       publicado=true;
       this.metaRecebida=true; this.ultimaMeta=meta;
+      await CACHE_LOCAL.marcarSincronizada();
 
       /* Depois que a nova versão vira a atual, apaga versões antigas conhecidas.
          Isso evita consumir o dobro/triplo do espaço só por histórico técnico. */
@@ -3582,10 +3604,12 @@ function concluir(header,linhas,nome,t0,mapaPreferido,remota){
   ST.dimGraf=ST.dims[0]; ST.pagina='painel';
   ST.aberto.clear(); ST.autoExp=true;
   renderFiltros(); atualizar();
-  /* Salvar a contingência local fora do caminho crítico evita travar a abertura de bases grandes. */
-  const salvarLocal=()=>CACHE_LOCAL.salvarBase(header,linhas,nome,ST.mapa);
-  if('requestIdleCallback' in window) requestIdleCallback(salvarLocal,{timeout:3000});
-  else setTimeout(salvarLocal,1200);
+  /* A importação local é aguardada em lerArquivo; bases remotas ficam disponíveis sem conexão. */
+  if(remota){
+    const salvarLocal=()=>CACHE_LOCAL.salvarBase(header,linhas,nome,ST.mapa,true);
+    if('requestIdleCallback' in window) requestIdleCallback(salvarLocal,{timeout:3000});
+    else setTimeout(salvarLocal,1200);
+  }
   toast((remota?'Base compartilhada atualizada: ':'')+nf0.format(ST.rows.length)+' linhas carregadas.'+
         (mesPadraoAtivo()?' Mostrando '+new Date(ST.f.ini).toLocaleDateString('pt-BR',{month:'long',year:'numeric'})+'; use "Tudo" para ver a base inteira.':''));
   return true;
@@ -3605,7 +3629,14 @@ async function lerArquivo(f,aba){
       const nome=f.name+' · aba "'+r.aba+'"';
       const mapaAnterior=mapaPreservadoPara(r.header);
       if(concluir(r.header,r.linhas,nome,t0,mapaAnterior)){
-        ocupado(''); // libera o painel imediatamente; o upload ocorre sem travar a ferramenta
+        statusSync('busy','Salvando neste navegador','Preservando a atualização antes de enviar ao Firebase');
+        const guardou=await CACHE_LOCAL.salvarBase(r.header,r.linhas,nome,ST.mapa,false);
+        ocupado('');
+        if(!guardou){
+          statusSync('error','Falha ao salvar localmente','A atualização não será enviada até existir uma cópia de segurança');
+          toast('Não foi possível preservar a atualização neste navegador. Libere espaço e tente novamente.');
+          return;
+        }
         FB.publicar(r.header,r.linhas,nome,ST.mapa);
       }
     } else {
@@ -3617,7 +3648,14 @@ async function lerArquivo(f,aba){
       ST.abasArquivo=[]; ST.abaEscolhida=null;
       const mapaAnterior=mapaPreservadoPara(parsed.header);
       if(concluir(parsed.header,parsed.linhas,f.name,t0,mapaAnterior)){
+        statusSync('busy','Salvando neste navegador','Preservando a atualização antes de enviar ao Firebase');
+        const guardou=await CACHE_LOCAL.salvarBase(parsed.header,parsed.linhas,f.name,ST.mapa,false);
         ocupado('');
+        if(!guardou){
+          statusSync('error','Falha ao salvar localmente','A atualização não será enviada até existir uma cópia de segurança');
+          toast('Não foi possível preservar a atualização neste navegador. Libere espaço e tente novamente.');
+          return;
+        }
         FB.publicar(parsed.header,parsed.linhas,f.name,ST.mapa);
       }
     }
@@ -3702,6 +3740,11 @@ async function confirmarLimparMemoria(){
 $('#limparConfirmar').onclick=confirmarLimparMemoria;
 $('#senhaLimpar').onkeydown=e=>{ if(e.key==='Enter') confirmarLimparMemoria(); };
 window.addEventListener('resize',debounce(()=>{ if(ST.rows.length&&ST.ver.graficos) renderGraficos(filtradas()); },250));
+window.addEventListener('beforeunload',e=>{
+  if(!CACHE_LOCAL.salvando) return;
+  e.preventDefault();
+  e.returnValue='';
+});
 
 const TIP=$('#tip');
 document.addEventListener('mouseover',e=>{ const t=e.target.closest&&e.target.closest('[data-tip]'); if(t){ TIP.innerHTML=t.getAttribute('data-tip'); TIP.classList.add('on'); } });
