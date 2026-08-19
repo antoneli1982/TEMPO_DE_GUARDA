@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Tempo de Guarda — Analytics de Armazenagem</title>
-<meta name="application-version" content="2026.08.19_firebase_4d808_online" />
+<meta name="application-version" content="2026.08.19_firebase_4d808_compact_v3" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -1040,17 +1040,32 @@ const CACHE_LOCAL = {
   async salvarBase(header,linhas,nome,mapa){
     if(this.restaurando||!header?.length||!linhas?.length) return;
     try{
-      await this.set('base',{header:[...header],linhas,nome:String(nome||'Base local'),salvoEm:Date.now()});
+      const bruto={header:[...header],linhas,nome:String(nome||'Base local'),salvoEm:Date.now()};
+      let pacote=bruto;
+      if(TEM_GZIP){
+        const texto=JSON.stringify(bruto);
+        const fluxo=new Blob([texto],{type:'application/json'}).stream().pipeThrough(new CompressionStream('gzip'));
+        const dados=await new Response(fluxo).arrayBuffer();
+        pacote={formato:'gzip-json-v1',dados,linhas:linhas.length,salvoEm:bruto.salvoEm};
+      }
+      await this.set('base',pacote);
       await this.salvarMapa(mapa,header);
-    }catch(e){ console.warn('Não foi possível salvar a cópia local da base',e); }
+    }catch(e){ console.warn('Não foi possível salvar a cópia local compactada da base',e); }
   },
   async salvarMapa(mapa,header){
     try{ await this.set('mapa',{mapa:mapaFirebase(mapa,header||ST.colunas),salvoEm:Date.now()}); }
     catch(e){ console.warn('Não foi possível salvar o mapeamento local',e); }
   },
   async carregar(){
-    try{ return {base:await this.get('base'),cfg:await this.get('mapa')}; }
-    catch(e){ console.warn('Não foi possível ler a cópia local',e); return {base:null,cfg:null}; }
+    try{
+      let base=await this.get('base');
+      if(base&&base.formato==='gzip-json-v1'&&base.dados){
+        if(!TEM_GZIP) throw new Error('A cópia local está compactada e este navegador não suporta GZIP.');
+        const fluxo=new Blob([base.dados]).stream().pipeThrough(new DecompressionStream('gzip'));
+        base=JSON.parse(await new Response(fluxo).text());
+      }
+      return {base,cfg:await this.get('mapa')};
+    }catch(e){ console.warn('Não foi possível ler a cópia local',e); return {base:null,cfg:null}; }
   },
   async limpar(){
     try{
@@ -1060,6 +1075,26 @@ const CACHE_LOCAL = {
     }catch(e){ console.warn('Não foi possível limpar a cópia local',e); }
   }
 };
+
+async function garantirArmazenamentoPersistente(){
+  try{
+    if(navigator.storage&&navigator.storage.persist){
+      await navigator.storage.persist();
+    }
+  }catch(e){ console.warn('Não foi possível solicitar armazenamento persistente',e); }
+}
+
+function zerarBaseVisual(){
+  ST.rows=[]; ST.rowsF=null; ST.colunas=[]; ST._linhas=[]; ST._arquivo=null;
+  ST.abasArquivo=[]; ST.abaEscolhida=null; ST.origem='—'; ST.arquivo='';
+  ST.minTs=0; ST.maxTs=0; ST.qtdBase=0; ST.semConf=0; ST.extras=[]; ST.exCols=[];
+  ST.f={ini:null,fim:null,fimExclusivo:false,sets:{},faixas:new Set(),soAtraso:false,soAberta:false,busca:''};
+  ST.aberto.clear(); ST.arv=null; ST.rowsF=null;
+  const painel=$('#painel'), vazio=$('#vazio');
+  if(painel) painel.style.display='none';
+  if(vazio) vazio.style.display='';
+  renderFiltros();
+}
 
 function mapaPreservadoPara(header){
   const automatico=autoMap(header||[]);
@@ -1094,7 +1129,7 @@ const FIREBASE_CONFIG = {
   measurementId: 'G-LX2J78Y69D'
 };
 const FIREBASE_RAIZ = 'tempoDeGuarda/compartilhado';
-const FIREBASE_PARTE_BYTES = 550 * 1024;
+const FIREBASE_PARTE_BYTES = 1500 * 1024; // lote bruto maior; no schema 3 cada lote é compactado com GZIP antes do envio
 /* ============================================================
    COMPACTAÇÃO FIREBASE
    A base operacional possui muita repetição (material, prédio,
@@ -1109,13 +1144,61 @@ function compactarLinhasFirebase(linhas){
     if(i===undefined){ i=dict.length; dict.push(s); mapa.set(s,i); }
     return i;
   };
-  return {
-    dict,
-    linhas:linhas.map(l=>listaFirebase(l).map(idx))
-  };
+  const compactas=linhas.map(l=>listaFirebase(l).map(idx));
+  return {dict,linhas:compactas};
 }
 function descompactarLinhasFirebase(linhas,dict){
   return listaFirebase(linhas).map(l=>listaFirebase(l).map(i=>dict[Number(i)]??''));
+}
+
+/* Compactação física: além do dicionário acima, os blocos JSON são enviados em GZIP + Base64.
+   Isso reduz o tráfego, a quantidade de nós e o espaço efetivamente ocupado no Realtime Database. */
+const TEM_GZIP = typeof CompressionStream!=='undefined' && typeof DecompressionStream!=='undefined';
+function bytesParaB64(bytes){
+  let out=''; const passo=0x8000;
+  for(let i=0;i<bytes.length;i+=passo){
+    const pedaco=bytes.subarray(i,Math.min(bytes.length,i+passo));
+    out+=String.fromCharCode.apply(null,pedaco);
+  }
+  return btoa(out);
+}
+function b64ParaBytes(b64){
+  const bin=atob(String(b64||'')), out=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i);
+  return out;
+}
+async function gzipTextoB64(texto){
+  if(!TEM_GZIP) return null;
+  const fluxo=new Blob([texto],{type:'application/json'}).stream().pipeThrough(new CompressionStream('gzip'));
+  const buf=await new Response(fluxo).arrayBuffer();
+  return bytesParaB64(new Uint8Array(buf));
+}
+async function gunzipTextoB64(b64){
+  if(!TEM_GZIP) throw new Error('Este navegador não oferece descompactação GZIP nativa.');
+  const bytes=b64ParaBytes(b64);
+  const fluxo=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return await new Response(fluxo).text();
+}
+async function empacotarJSONFirebase(valor){
+  if(!TEM_GZIP) return {gzip:false,dado:valor};
+  return {gzip:true,dado:await gzipTextoB64(JSON.stringify(valor))};
+}
+async function desempacotarJSONFirebase(dado,gzip){
+  if(!gzip) return dado;
+  return JSON.parse(await gunzipTextoB64(dado));
+}
+function* partesCompactadasFirebase(linhas){
+  const enc=new TextEncoder();
+  let parte=[], bytes=2;
+  for(const raw of linhas){
+    const linha=Array.isArray(raw)?raw:listaFirebase(raw).map(Number);
+    const tam=enc.encode(JSON.stringify(linha)).byteLength+1;
+    if(parte.length&&bytes+tam>FIREBASE_PARTE_BYTES){
+      yield parte; parte=[]; bytes=2;
+    }
+    parte.push(linha); bytes+=tam;
+  }
+  if(parte.length) yield parte;
 }
 
 
@@ -1164,7 +1247,7 @@ function detalheFirebase(meta){
 const FB = {
   appSdk:null, dbSdk:null, authSdk:null, db:null, auth:null,
   pronto:false, conectado:false, autenticado:false, iniciando:false, erroAuth:null,
-  publicando:false, versao:null, assinatura:null, cargaSeq:0, pendente:null, mapaPendente:null,
+  publicando:false, versao:null, assinatura:null, cargaSeq:0, pendente:null, mapaPendente:null, apagarPendente:false,
   metaRecebida:false, carregando:false, ultimaMeta:null,
 
   async iniciar(appSdk,dbSdk,authSdk){
@@ -1202,7 +1285,10 @@ const FB = {
       else if(this.metaRecebida) statusSync('ok','Banco vazio','Ainda não existe uma base compartilhada');
       else statusSync('busy','Buscando base','Conectado ao banco compartilhado');
 
-      if(this.pendente&&!this.publicando){
+      if(this.apagarPendente&&!this.publicando){
+        this.apagarPendente=false;
+        this.limpar();
+      } else if(this.pendente&&!this.publicando){
         const p=this.pendente; this.pendente=null; this.mapaPendente=null;
         this.publicar(p.header,p.linhas,p.nome,p.mapa);
       } else if(this.mapaPendente&&!this.publicando){
@@ -1227,6 +1313,12 @@ const FB = {
     if(!meta||!meta.version){
       this.cargaSeq++; this.carregando=false; ocupado('');
       this.versao=null; this.assinatura=null;
+      /* Se o Firebase confirmou que a base compartilhada está vazia, não deixe uma cópia antiga
+         do IndexedDB reaparecer como se ainda fosse a base atual. */
+      if(this.conectado&&!this.pendente&&!this.publicando){
+        await CACHE_LOCAL.limpar();
+        if(ST.rows.length) zerarBaseVisual();
+      }
       statusSync(this.conectado?'ok':'off','Banco vazio','Ainda não existe uma base compartilhada');
       return;
     }
@@ -1264,6 +1356,14 @@ const FB = {
     this.carregando=true;
     const linhas=[];
     try{
+      let dict=meta.dict||null;
+      const schema3=Number(meta.schema)>=3;
+      if(schema3){
+        const dictSnap=await this.dbSdk.get(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/bases/'+meta.version+'/dict'));
+        if(token!==this.cargaSeq) return;
+        if(!dictSnap.exists()) throw new Error('Dicionário compactado da base não encontrado');
+        dict=await desempacotarJSONFirebase(dictSnap.val(),meta.gzip===true);
+      }
       for(let inicio=0;inicio<total;inicio+=4){
         const fim=Math.min(total,inicio+4), buscas=[];
         for(let i=inicio;i<fim;i++){
@@ -1273,12 +1373,14 @@ const FB = {
         const snaps=await Promise.all(buscas);
         if(token!==this.cargaSeq) return;
         for(const snap of snaps){
-          const parte=listaFirebase(snap.val());
-          if(meta.compact && meta.dict){
-            const dec=descompactarLinhasFirebase(parte,meta.dict);
+          let parte;
+          if(schema3) parte=await desempacotarJSONFirebase(snap.val(),meta.gzip===true);
+          else parte=listaFirebase(snap.val());
+          if((schema3||meta.compact) && dict){
+            const dec=descompactarLinhasFirebase(parte,dict);
             for(const raw of dec) linhas.push(raw);
           } else {
-            for(const raw of parte) linhas.push(linhaFirebase(raw));
+            for(const raw of listaFirebase(parte)) linhas.push(linhaFirebase(raw));
           }
         }
         ocupado('Baixando a base compartilhada… '+Math.min(fim,total)+' de '+total);
@@ -1301,7 +1403,7 @@ const FB = {
     if(!this.pronto||!this.conectado||this.publicando){
       this.pendente=dados;
       statusSync('busy','Aguardando conexão','A base será enviada assim que a conexão estiver disponível');
-      toast('Base carregada neste navegador. A sincronização aguarda a conexão.');
+      if(!this.publicando) toast('Base aberta neste navegador. A sincronização será concluída quando houver conexão.');
       return false;
     }
 
@@ -1316,6 +1418,7 @@ const FB = {
       const headerLimpo=listaFirebase(header).map(v=>String(v==null?'':v));
       const mapaLimpo=mapaFirebase(mapa,headerLimpo);
       const compactado=compactarLinhasFirebase(linhas);
+      const gzip=TEM_GZIP;
       let indice=0, concluidas=0, grupo=[];
 
       const esperarGrupo=async()=>{
@@ -1324,14 +1427,17 @@ const FB = {
         if(falhou) throw falhou.reason;
       };
 
-      ocupado('Preparando a sincronização…');
-      for(const parte of partesFirebase(compactado.linhas)){
+      statusSync('busy','Compactando base','Preparando os dados em formato compacto para economizar armazenamento');
+      const dictPacote=await empacotarJSONFirebase(compactado.dict);
+      await this.dbSdk.set(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/bases/'+versao+'/dict'),dictPacote.dado);
+
+      for(const parte of partesCompactadasFirebase(compactado.linhas)){
         const i=indice++, chave=String(i).padStart(6,'0');
-        const tarefa=this.dbSdk.set(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/bases/'+versao+'/chunks/'+chave),parte)
+        const pacote=await empacotarJSONFirebase(parte);
+        const tarefa=this.dbSdk.set(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/bases/'+versao+'/chunks/'+chave),pacote.dado)
           .then(()=>{
             concluidas++;
-            statusSync('busy','Enviando parte '+concluidas,'Sincronizando a base compartilhada');
-            ocupado('Enviando a base compartilhada… parte '+concluidas);
+            statusSync('busy','Enviando '+concluidas+'/'+indice,'Sincronizando a base compactada sem bloquear o painel');
           });
         grupo.push(tarefa);
         if(grupo.length>=4) await esperarGrupo();
@@ -1341,24 +1447,25 @@ const FB = {
 
       const agora=Date.now();
       const meta={
-        schema:2, version:versao, nome:String(nome||'Base compartilhada'),
+        schema:3, version:versao, nome:String(nome||'Base compartilhada'),
         header:headerLimpo, mapa:mapaLimpo, chunkCount:indice,
         rowCount:linhas.length, savedAt:agora, mapUpdatedAt:agora,
-        compact:true, dict:compactado.dict
+        compact:true, gzip, compression:gzip?'dictionary+gzip':'dictionary'
       };
-      if(metaAnterior.version) meta.previousVersion=metaAnterior.version;
       const assinatura=versao+'|'+agora;
       this.versao=versao; this.assinatura=assinatura;
       await this.dbSdk.set(atualRef,meta);
       publicado=true;
       this.metaRecebida=true; this.ultimaMeta=meta;
 
-      const expirar=metaAnterior.previousVersion;
-      if(expirar&&expirar!==metaAnterior.version&&expirar!==versao){
-        try{ await this.dbSdk.remove(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/bases/'+expirar)); }catch(_){}
+      /* Depois que a nova versão vira a atual, apaga versões antigas conhecidas.
+         Isso evita consumir o dobro/triplo do espaço só por histórico técnico. */
+      const antigas=[metaAnterior.version,metaAnterior.previousVersion].filter(v=>v&&v!==versao);
+      for(const antiga of [...new Set(antigas)]){
+        try{ await this.dbSdk.remove(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/bases/'+antiga)); }catch(_){}
       }
-      statusSync('ok','Sincronizado',detalheFirebase(meta));
-      toast(nf0.format(linhas.length)+' linhas sincronizadas em todos os navegadores.');
+      statusSync('ok','Sincronizado',detalheFirebase(meta)+(gzip?' · GZIP ativo':''));
+      toast(nf0.format(linhas.length)+' linhas sincronizadas'+(gzip?' com compactação GZIP.':'.'));
       return true;
     }catch(e){
       this.versao=versaoAnterior; this.assinatura=assinaturaAnterior;
@@ -1366,29 +1473,51 @@ const FB = {
         try{ await this.dbSdk.remove(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/bases/'+versao)); }catch(_){}
       }
       this.falha(e);
-      toast('A base ficou disponível apenas neste navegador. Tente novamente quando houver conexão.');
+      toast('A base continua aberta neste navegador, mas a sincronização não terminou.');
       return false;
     }finally{
-      this.publicando=false; ocupado('');
+      this.publicando=false;
+      /* Nunca cubra o painel durante upload: bases grandes continuam utilizáveis enquanto sincronizam. */
+      ocupado('');
+      if(this.pendente){
+        const p=this.pendente; this.pendente=null;
+        setTimeout(()=>this.publicar(p.header,p.linhas,p.nome,p.mapa),0);
+      }
     }
   },
 
   async limpar(){
-    if(!this.pronto||!this.dbSdk||!this.db){
-      toast('Sem conexão com o banco compartilhado no momento. Tente novamente em instantes.');
-      return false;
-    }
+    /* A limpeza local é imediata. A remota usa um único remove na raiz para evitar exclusão parcial
+       (current apagado e bases antigas sobrando, ou o contrário). */
     ocupado('Apagando a base compartilhada…');
     try{
-      await this.dbSdk.remove(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/current'));
-      await this.dbSdk.remove(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/bases'));
       await CACHE_LOCAL.limpar();
-      this.versao=null; this.assinatura=null; this.ultimaMeta=null; this.pendente=null; this.mapaPendente=null;
-      toast('Memória compartilhada apagada. Todos os navegadores voltarão à tela inicial.');
+      this.cargaSeq++;
+      this.pendente=null; this.mapaPendente=null;
+      if(!this.pronto||!this.dbSdk||!this.db||!this.conectado){
+        this.apagarPendente=true;
+        zerarBaseVisual();
+        statusSync('off','Exclusão pendente','A cópia local foi apagada; o Firebase será limpo automaticamente quando a conexão voltar');
+        toast('A cópia deste navegador foi apagada. A exclusão do Firebase ficou programada para a reconexão.');
+        return false;
+      }
+      try{
+        await this.dbSdk.remove(this.dbSdk.ref(this.db,FIREBASE_RAIZ));
+      }catch(erroRaiz){
+        /* Compatibilidade com regras antigas que autorizem apenas os dois filhos. */
+        await this.dbSdk.remove(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/current'));
+        await this.dbSdk.remove(this.dbSdk.ref(this.db,FIREBASE_RAIZ+'/bases'));
+      }
+      this.apagarPendente=false;
+      this.versao=null; this.assinatura=null; this.ultimaMeta=null;
+      zerarBaseVisual();
+      statusSync('ok','Banco vazio','Base compartilhada apagada');
+      toast('Base compartilhada apagada com sucesso em todos os navegadores.');
       return true;
     }catch(e){
       this.falha(e);
-      toast('Não foi possível apagar a base compartilhada.');
+      toast('Não foi possível apagar a base do Firebase. A cópia local deste navegador foi removida.');
+      zerarBaseVisual();
       return false;
     }finally{
       ocupado('');
@@ -3453,7 +3582,10 @@ function concluir(header,linhas,nome,t0,mapaPreferido,remota){
   ST.dimGraf=ST.dims[0]; ST.pagina='painel';
   ST.aberto.clear(); ST.autoExp=true;
   renderFiltros(); atualizar();
-  CACHE_LOCAL.salvarBase(header,linhas,nome,ST.mapa);
+  /* Salvar a contingência local fora do caminho crítico evita travar a abertura de bases grandes. */
+  const salvarLocal=()=>CACHE_LOCAL.salvarBase(header,linhas,nome,ST.mapa);
+  if('requestIdleCallback' in window) requestIdleCallback(salvarLocal,{timeout:3000});
+  else setTimeout(salvarLocal,1200);
   toast((remota?'Base compartilhada atualizada: ':'')+nf0.format(ST.rows.length)+' linhas carregadas.'+
         (mesPadraoAtivo()?' Mostrando '+new Date(ST.f.ini).toLocaleDateString('pt-BR',{month:'long',year:'numeric'})+'; use "Tudo" para ver a base inteira.':''));
   return true;
@@ -3472,7 +3604,10 @@ async function lerArquivo(f,aba){
       ST.abasArquivo=r.abas; ST.abaEscolhida=r.aba;
       const nome=f.name+' · aba "'+r.aba+'"';
       const mapaAnterior=mapaPreservadoPara(r.header);
-      if(concluir(r.header,r.linhas,nome,t0,mapaAnterior)) await FB.publicar(r.header,r.linhas,nome,ST.mapa);
+      if(concluir(r.header,r.linhas,nome,t0,mapaAnterior)){
+        ocupado(''); // libera o painel imediatamente; o upload ocorre sem travar a ferramenta
+        FB.publicar(r.header,r.linhas,nome,ST.mapa);
+      }
     } else {
       ocupado('Lendo '+f.name+'…');
       const txt=await f.text();
@@ -3481,13 +3616,20 @@ async function lerArquivo(f,aba){
       const parsed=parseCSV(txt);
       ST.abasArquivo=[]; ST.abaEscolhida=null;
       const mapaAnterior=mapaPreservadoPara(parsed.header);
-      if(concluir(parsed.header,parsed.linhas,f.name,t0,mapaAnterior)) await FB.publicar(parsed.header,parsed.linhas,f.name,ST.mapa);
+      if(concluir(parsed.header,parsed.linhas,f.name,t0,mapaAnterior)){
+        ocupado('');
+        FB.publicar(parsed.header,parsed.linhas,f.name,ST.mapa);
+      }
     }
   }catch(e){ toast('Erro ao ler o arquivo: '+e.message); }
   ocupado('');
 }
 
-$('#file').addEventListener('change',e=>lerArquivo(e.target.files[0]));
+$('#file').addEventListener('change',e=>{
+  const f=e.target.files[0];
+  if(f) lerArquivo(f);
+  e.target.value=''; // permite importar novamente o mesmo arquivo sem precisar recarregar a página
+});
 ['dragenter','dragover'].forEach(ev=>document.addEventListener(ev,e=>{ e.preventDefault(); $('#vazio').classList.add('drag'); }));
 ['dragleave','drop'].forEach(ev=>document.addEventListener(ev,e=>{ e.preventDefault(); if(ev==='drop'||e.relatedTarget==null) $('#vazio').classList.remove('drag'); }));
 document.addEventListener('drop',e=>{ const f=e.dataTransfer&&e.dataTransfer.files[0]; if(f) lerArquivo(f); });
@@ -3554,9 +3696,8 @@ async function confirmarLimparMemoria(){
     return;
   }
   $('#senhaErro').classList.remove('on');
-  const ok=await FB.limpar();
+  await FB.limpar();
   fecharLimparModal();
-  if(ok) setTimeout(()=>location.reload(),900);
 }
 $('#limparConfirmar').onclick=confirmarLimparMemoria;
 $('#senhaLimpar').onkeydown=e=>{ if(e.key==='Enter') confirmarLimparMemoria(); };
@@ -3615,6 +3756,7 @@ window.addEventListener('offline',()=>{
   FB.conectado=false;
   statusSync('off','Sem conexão','O painel continua aberto e voltará a sincronizar quando a internet retornar');
 });
+garantirArmazenamentoPersistente();
 restaurarBaseLocal().finally(()=>iniciarFirebase());
 
 </script>
